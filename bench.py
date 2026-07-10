@@ -258,7 +258,8 @@ if __name__ == "__main__":
         "confronto tra DEPLOYMENT, non modelli ideali",
     }
 
-    with open(results_dir / f"{run_id}.jsonl", "w") as logf:
+    # buffering=1: i trial completati sopravvivono a un kill a metà run (lezione 10 lug)
+    with open(results_dir / f"{run_id}.jsonl", "w", buffering=1) as logf:
         logf.write(json.dumps({"MANIFEST": manifest}) + "\n")
         fb = not args.no_reasoning_fallback
         if not args.no_local:

@@ -613,7 +613,9 @@ if __name__ == "__main__":
         "note": "ladder: harness fisso-per-rung, modello per-colonna; null = voto compute-matched",
     }
     print(f"LADDER · {manifest}")
-    with open(HERE / "results" / f"{run_id}_ladder.jsonl", "w") as logf:
+    # buffering=1 (line-buffered): un run killed a metà NON perde i trial completati —
+    # il run 20260710T163022 è morto con 24 trial fatti e 0 righe su disco. # VERIFIED
+    with open(HERE / "results" / f"{run_id}_ladder.jsonl", "w", buffering=1) as logf:
         logf.write(json.dumps({"MANIFEST": manifest}) + "\n")
         results = run_experiment(
             models,
