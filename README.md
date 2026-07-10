@@ -113,6 +113,20 @@ Design: workflow 3-ricerche + critica avversaria (che ha bocciato KV-quant/specu
 - **La lezione dell'arco (con chain_mul come controesempio)**: il loop engineering paga quando il tool/verificatore COPRE il failure-mode reale (chain_mul: errore aritmetico → errore-istruttivo → 0%→100%); non può salvare ragionamento che il tool non raggiunge (ledger: branch logic → coercizione inutile). **L'harness va accoppiato al failure-mode, non aggiunto in generale.**
 - Candidati per alzare il ledger (futuri, non ora): rung h4/p (verify sul branch reasoning), tool nuovo che verifichi le CONDIZIONI (non l'aritmetica), o modello più capace come colonna.
 
+### Piano FINALE a 7 rung (10 lug sera, L=48, think=off, 14B Q4, n=20 salvo nota)
+| rung | acc | CI95 | ~tok | calls | verdetto |
+|---|---|---|---|---|---|
+| **h0** naked | **45%** | 26-66% | 1479 | 1.0 | floor |
+| h2 loop | 30% | 15-52% | 1751 | 1.1 | tool ignorati |
+| h3 repair | 30% | 15-52% | 1779 | 3.0 | ingaggio forzato, acc invariata |
+| h4 verify | 25% | 11-47% | 3346 | 2.1 | 2.3× compute, peggio di tutti |
+| **p** prompt-twin | **45%** | 26-66% | **1385** | 1.0 | = h0 al costo MINIMO |
+| nullA voto×5 (n=8) | 38% | 14-69% | 7597 | 5.0 | 5× compute < h0 |
+| nullB voto×2 | 15% | 5-36% | 3158 | 2.1 | ⚠️ degenere: K=2 + tie=wrong |
+- **Verdetti pre-registrati**: h4 vs nullB → sopra ma CI sovrapposte E nullB è handicappato (a K=2 due campioni hot raramente concordano → quasi tutto tie → il "compute-matched" è formale, non informativo; per un null onesto di h4 servirebbe K=2 con tie-break, o K=3). h4 vs p → **p vince nettamente in direzione** (45 vs 25 a 0.4× dei token; CI sovrapposte a n=20, ma h4 perde su ENTRAMBI i corni del test → NON è architettura).
+- **La sintesi dell'intera giornata**: su questo (task procedurale branch-heavy × 14B Q4 × think-off), **la scala della struttura è INVERTITA** — una frase nel prompt ("risolvi, poi ricontrolla il tuo calcolo") vale +15pt su h2 e pareggia il naked al costo più basso del piano; ogni struttura aggiunta (tool, coercizione, verify a contesto fresco) rende uguale o peggio a costo maggiore. Insieme a chain_mul (errore-istruttivo 0→100%) il quadro è coerente: **l'harness paga solo dove tocca il failure-mode; altrove è tassa**. "Loop engineering" ≠ "più loop": è scegliere il rung giusto per il fallimento giusto.
+- Caveat di validità: n=20, CI larghe, UN task, UN modello, UNA quant, regime think-off. Direzioni nette, separazioni statistiche no. Non generalizzare oltre.
+
 ### Bench 14B think=off + errore-istruttivo (10 lug) — chain_mul 0/4 → 4/4
 - Run `20260710T175842`: 16/20, con **chain_mul 0/4 deterministico**. Transcript: il modello chiama kv_get×2 + calc **in parallelo nello stesso turno** passando a calc i SIMBOLI non risolti (`(gamma - delta) * 3`) → `ERROR: espressione non consentita` → pur vedendo 100 e 9, INVENTA "sottrazione non consentita" e consegna `RISPOSTA: 0`.
 - **Fix = 1 stringa**: errore di calc reso ISTRUTTIVO ("usa solo NUMERI… riprova con i valori numerici"). Run `20260710T180147`: **ANSWER-ACC 20/20 = 100% [CI95 84-100%] · 3.3s/task** (vs 12-170s/task dei run col thinking). Il modello si auto-corregge al giro dopo (`calc('(100 - 9) * 3')` → 273).
