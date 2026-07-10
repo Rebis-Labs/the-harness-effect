@@ -102,6 +102,17 @@ Design: workflow 3-ricerche + critica avversaria (che ha bocciato KV-quant/specu
 - **Lettura onesta**: CI larghe (n=8), nessuna separazione conclusiva — ma direzione coerente: **su questo task l'harness coi tool SOTTRAE** (h2 sotto nullA e sotto h0) perché il modello non ingaggia i tool e il system tool-oriented lo degrada vs NEUTRAL. L'harness toglie capacità oltre che aggiungerla: la tesi in negativo. Da blindare con n=20+ su h0/h2. Il rung `tool_choice` coercitivo (bocciato come variante bench) è ora una domanda sperimentale legittima per la ladder.
 - **Voto self-consistency**: a temp 0.7 il per-sample degrada più di quanto la maggioranza recuperi (38% @ 5× vs 50% @ 1×).
 
+### Conferma n=20 + rung h3 (10 lug sera) — il verdetto dell'arco
+| rung | acc n=20 | CI95 | ~tok | calls | nota |
+|---|---|---|---|---|---|
+| h0 naked | **45%** | 26-66% | 1479 | 1.0 | floor stabile (era 50% a n=8) |
+| h2 loop | 30% | 15-52% | 1751 | 1.1 | tool quasi mai ingaggiati (2/20) |
+| h3 repair | 30% | 15-52% | 1779 | 3.0 | **repair scattato 19/20, ingaggio OTTENUTO, acc INVARIATA** |
+- Il gap h0-vs-h2 a n=20 si restringe (45 vs 30, CI sovrapposte): la lettura n=8 (50 vs 12) era pessimista — direzione negativa mild, non separata.
+- **h3 = h2 spaccato**: forzare l'uso di calc funziona meccanicamente ma non sposta l'accuratezza. Sul ledger gli errori NON sono aritmetici: sono nelle **decisioni di branch** (≥45% condizionali data-dependent BY DESIGN) che calc non tocca. Il task ha funzionato esattamente come progettato: headroom sopra il tool-floor che i tool non possono riempire.
+- **La lezione dell'arco (con chain_mul come controesempio)**: il loop engineering paga quando il tool/verificatore COPRE il failure-mode reale (chain_mul: errore aritmetico → errore-istruttivo → 0%→100%); non può salvare ragionamento che il tool non raggiunge (ledger: branch logic → coercizione inutile). **L'harness va accoppiato al failure-mode, non aggiunto in generale.**
+- Candidati per alzare il ledger (futuri, non ora): rung h4/p (verify sul branch reasoning), tool nuovo che verifichi le CONDIZIONI (non l'aritmetica), o modello più capace come colonna.
+
 ### Bench 14B think=off + errore-istruttivo (10 lug) — chain_mul 0/4 → 4/4
 - Run `20260710T175842`: 16/20, con **chain_mul 0/4 deterministico**. Transcript: il modello chiama kv_get×2 + calc **in parallelo nello stesso turno** passando a calc i SIMBOLI non risolti (`(gamma - delta) * 3`) → `ERROR: espressione non consentita` → pur vedendo 100 e 9, INVENTA "sottrazione non consentita" e consegna `RISPOSTA: 0`.
 - **Fix = 1 stringa**: errore di calc reso ISTRUTTIVO ("usa solo NUMERI… riprova con i valori numerici"). Run `20260710T180147`: **ANSWER-ACC 20/20 = 100% [CI95 84-100%] · 3.3s/task** (vs 12-170s/task dei run col thinking). Il modello si auto-corregge al giro dopo (`calc('(100 - 9) * 3')` → 273).
