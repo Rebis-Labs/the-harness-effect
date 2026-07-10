@@ -1,0 +1,11 @@
+# venv / python
+*-venv/
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+
+# os
+.DS_Store
+
+# results restano tracciati (sono il record sperimentale) — NON ignorare results/
