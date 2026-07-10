@@ -8,6 +8,7 @@ RUNG (harness crescente, temp=0):
   h0  naked      — NEUTRAL_SYSTEM, NIENTE tool, 1 turno. Il modello risolve in-testa. FLOOR.
   h1  tool-1     — 1 giro di tool poi risposta forzata (tool tolti al turno finale).
   h2  loop       — l'agentic loop pieno (run_agent). Il valore del LOOP = memoria-scratch esterna.
+  h3  repair     — h2 + repair loop se risponde senza calc (max 2). Tool-ENGAGEMENT, taggato.
   h4  verify     — h2, poi un passo indipendente 'verifica e correggi' a contesto fresco.
   p   prompt-twin— h2 col wording 'controlla il tuo lavoro' già nel prompt (0 struttura extra).
 
@@ -76,7 +77,17 @@ def _exec(tc: dict) -> str:
 # result = {"final", "tok", "calls", "refused", "trunc", "tok_in", "ref_partial"}.
 # ctx = {"cold", "hot", "K"}. NOTA: il compute-matching dei null resta su tok (=output);
 # tok_in è tracciato per trasparenza (il context cresce col loop) ma NON entra nel matching.
-def _res(final, tok, calls, refused=False, trunc=False, tok_in=0, ref_partial=0):
+def _res(
+    final,
+    tok,
+    calls,
+    refused=False,
+    trunc=False,
+    tok_in=0,
+    ref_partial=0,
+    repaired=False,
+    repair_rounds=0,
+):
     return {
         "final": final,
         "tok": tok,
@@ -85,6 +96,8 @@ def _res(final, tok, calls, refused=False, trunc=False, tok_in=0, ref_partial=0)
         "trunc": trunc,
         "tok_in": tok_in,
         "ref_partial": ref_partial,  # rifiuti PARZIALI dentro un voto (0 nei rung singoli)
+        "repaired": repaired,  # solo h3: risposta arrivata dopo re-iniezione REPAIR_MSG
+        "repair_rounds": repair_rounds,
     }
 
 
@@ -143,6 +156,33 @@ def rung_h2(ctx, prompt):
         r["finish_reason"] == "refusal",
         r["truncated"],
         r["tokens_in"],
+    )
+
+
+def rung_h3(ctx, prompt):
+    """h2 + REPAIR LOOP (tool-engagement onesto): se la risposta finale arriva senza `calc`,
+    re-inietta REPAIR_MSG (max 2 round, dentro max_turns). Era differito dalla critica 10 lug;
+    PROMOSSO dalla prima curva locale: h2 = 1.0 calls (tool mai ingaggiati) e 12% vs h0 50% —
+    la domanda 'far USARE il loop aiuta?' è ora IL reperto da spiegare. Trial taggati repaired
+    (mai sommare a pass lisci). required={calc}: sul ledger l'aritmetica è l'unico tool utile."""
+    r = run_agent(
+        ctx["cold"],
+        prompt,
+        max_turns=6,
+        system=SYSTEM,
+        tools_enabled=True,
+        required_tools={"calc"},
+        max_repairs=2,
+    )
+    return _res(
+        r["final"],
+        r["tokens_out"],
+        r["turns"],
+        r["finish_reason"] == "refusal",
+        r["truncated"],
+        r["tokens_in"],
+        repaired=r["repaired"],
+        repair_rounds=r["repair_rounds"],
     )
 
 
@@ -230,6 +270,7 @@ RUNGS = {
     "h0": rung_h0,
     "h1": rung_h1,
     "h2": rung_h2,
+    "h3": rung_h3,
     "h4": rung_h4,
     "p": rung_p,
     "nullA": rung_nullA,
@@ -434,6 +475,8 @@ def run_experiment(
                             "tok": r["tok"],
                             "tok_in": r["tok_in"],
                             "ref_partial": r["ref_partial"],
+                            "repaired": r.get("repaired", False),
+                            "repair_rounds": r.get("repair_rounds", 0),
                             "calls": r["calls"],
                         }
                     )
@@ -523,6 +566,10 @@ def print_plane(models, rung_names, results):
             _verdict("h2 (loop)", ag["h2"], "h1 (tool-1)", ag["h1"])
         if "h2" in ag and "nullA" in ag:
             _verdict("h2 (loop)", ag["h2"], "nullA (voto-h0)", ag["nullA"])
+        if "h3" in ag and "h2" in ag:
+            _verdict("h3 (repair)", ag["h3"], "h2 (loop)", ag["h2"])
+        if "h3" in ag and "nullA" in ag:
+            _verdict("h3 (repair)", ag["h3"], "nullA (voto-h0)", ag["nullA"])
         if "h4" in ag and "nullB" in ag:
             _verdict("h4 (verify)", ag["h4"], "nullB (voto-h2)", ag["nullB"])
         if "h4" in ag and "p" in ag:
