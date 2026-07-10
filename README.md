@@ -92,6 +92,22 @@ Design: workflow 3-ricerche + critica avversaria (che ha bocciato KV-quant/specu
 - **Calibrazione L nel regime think=off** (pilot h0, n=12, 14B Q4): L=6→83% · L=10→100% · L=12→92% · L=16→83% · L=24→58% · L=32→50%. Nota: con `/no_think` il modello scrive comunque i passi nel content (CoT visibile) — h0 resta "in-testa" per definizione (nessun tool), ma non è "senza ragionamento". Il canary L=12 0/1 era un seed sfortunato (n=1 non dimostra nulla — di nuovo).
 - **Reperto canary**: a temp=0, L=12 seed=1000, h0/h1/h2 danno TUTTI 168 vs gold 190 con **0 tool-call in h2** — il modello ignora i tool e sbaglia un branch in testa. Stesso failure-mode di `three_sum` → è il caso d'uso del repair loop.
 
+### Prima curva ladder locale COMPLETA (10 lug, 14B Q4, think=off, L=48, n=8)
+| rung | acc | CI95 | ~tok | nota |
+|---|---|---|---|---|
+| h0 naked | **50%** | 22-78% | 1531 | il floor vince |
+| h1 tool-1 | 12% | 2-47% | 1407 | ⬇ |
+| h2 loop | 12% | 2-47% | 1407 | **1.0 calls: tool MAI usati** |
+| nullA voto×5 | 38% | 14-69% | 7597 | 5× compute < h0 greedy |
+- **Lettura onesta**: CI larghe (n=8), nessuna separazione conclusiva — ma direzione coerente: **su questo task l'harness coi tool SOTTRAE** (h2 sotto nullA e sotto h0) perché il modello non ingaggia i tool e il system tool-oriented lo degrada vs NEUTRAL. L'harness toglie capacità oltre che aggiungerla: la tesi in negativo. Da blindare con n=20+ su h0/h2. Il rung `tool_choice` coercitivo (bocciato come variante bench) è ora una domanda sperimentale legittima per la ladder.
+- **Voto self-consistency**: a temp 0.7 il per-sample degrada più di quanto la maggioranza recuperi (38% @ 5× vs 50% @ 1×).
+
+### Bench 14B think=off + errore-istruttivo (10 lug) — chain_mul 0/4 → 4/4
+- Run `20260710T175842`: 16/20, con **chain_mul 0/4 deterministico**. Transcript: il modello chiama kv_get×2 + calc **in parallelo nello stesso turno** passando a calc i SIMBOLI non risolti (`(gamma - delta) * 3`) → `ERROR: espressione non consentita` → pur vedendo 100 e 9, INVENTA "sottrazione non consentita" e consegna `RISPOSTA: 0`.
+- **Fix = 1 stringa**: errore di calc reso ISTRUTTIVO ("usa solo NUMERI… riprova con i valori numerici"). Run `20260710T180147`: **ANSWER-ACC 20/20 = 100% [CI95 84-100%] · 3.3s/task** (vs 12-170s/task dei run col thinking). Il modello si auto-corregge al giro dopo (`calc('(100 - 9) * 3')` → 273).
+- **Lezione (la più pulita finora)**: il messaggio d'errore di un tool È harness — un errore che dice *come* rimediare trasforma 0% in 100% a modello identico. Terza dimostrazione della tesi dopo le tool-description (Fable cyber) e max_tokens (truncation).
+- Nota repair loop: su questi task non è MAI scattato (traj 16/16 — i prompt nominano i tool). Il trigger attuale (tool richiesti mancanti) non copre "tool errato + resa": estensione possibile ma differita (anti-mostro).
+
 ## Estensioni naturali (se e quando)
 - Terzo provider = OpenRouter → confronti Qwen locale vs Qwen-cloud vs Fable a parità di harness (isola anche la quantizzazione).
 - Variare l'HARNESS (system prompt, n tool, retry) tenendo il modello fisso → misura il *contributo dell'harness* (l'altra metà dell'1,6%).

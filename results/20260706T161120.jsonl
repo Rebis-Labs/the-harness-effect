@@ -1,0 +1,31 @@
+{"MANIFEST": {"run_id": "20260706T161120", "harness_md5": "b30b6872", "n": 3, "tasks": 5, "max_tokens": 4096, "temperature": 0.0, "reasoning_fallback": true, "note": "locale = Q4 quantizzato + thinking; confronto tra DEPLOYMENT, non modelli ideali"}}
+{"task": "sum_two", "answer": 59, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 59", "tool_names": ["kv_get", "kv_get", "calc", "RISPOSTA"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 618, "latency_s": 47.65}
+{"task": "sum_two", "answer": 59, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 59", "tool_names": ["kv_get", "kv_get", "calc", "RISPOSTA"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 618, "latency_s": 47.17}
+{"task": "sum_two", "answer": 59, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 59", "tool_names": ["kv_get", "kv_get", "calc", "RISPOSTA"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 618, "latency_s": 50.98}
+{"task": "chain_mul", "answer": 273, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 273", "tool_names": ["kv_get", "kv_get", "calc", "kv_get", "kv_get", "calc"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 1328, "latency_s": 105.16}
+{"task": "chain_mul", "answer": 273, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 273", "tool_names": ["kv_get", "kv_get", "calc", "kv_get", "kv_get", "calc"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 1328, "latency_s": 110.71}
+{"task": "chain_mul", "answer": 273, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 273", "tool_names": ["kv_get", "kv_get", "calc", "kv_get", "kv_get", "calc"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 1328, "latency_s": 107.91}
+{"task": "three_sum", "answer": 53, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 53", "tool_names": ["kv_get", "kv_get", "kv_get", "calc", "calc", "calc"], "turns": 3, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 4430, "latency_s": 381.74}
+{"task": "three_sum", "answer": 53, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 53", "tool_names": ["kv_get", "kv_get", "kv_get", "calc"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 4175, "latency_s": 343.15}
+{"task": "three_sum", "answer": 53, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 53", "tool_names": ["kv_get", "kv_get", "kv_get", "calc"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 4175, "latency_s": 334.25}
+{"task": "word_count", "answer": 6, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 6", "tool_names": ["word_count"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 283, "latency_s": 23.04}
+{"task": "word_count", "answer": 6, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 6", "tool_names": ["word_count"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 205, "latency_s": 16.57}
+{"task": "word_count", "answer": 6, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 6", "tool_names": ["word_count"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 205, "latency_s": 16.58}
+{"task": "no_tool", "answer": 51, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 51", "tool_names": ["calc"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 467, "latency_s": 40.89}
+{"task": "no_tool", "answer": 51, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 51", "tool_names": ["calc"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 467, "latency_s": 39.36}
+{"task": "no_tool", "answer": 51, "strict": true, "lenient": true, "final": "\n\nRISPOSTA: 51", "tool_names": ["calc"], "turns": 2, "truncated": false, "recovered_from_reasoning": false, "finish": true, "tokens_out": 467, "latency_s": 39.4}
+{"task": "sum_two", "error": "HTTP Error 400: Bad Request"}
+{"task": "sum_two", "error": "HTTP Error 400: Bad Request"}
+{"task": "sum_two", "error": "HTTP Error 400: Bad Request"}
+{"task": "chain_mul", "error": "HTTP Error 400: Bad Request"}
+{"task": "chain_mul", "error": "HTTP Error 400: Bad Request"}
+{"task": "chain_mul", "error": "HTTP Error 400: Bad Request"}
+{"task": "three_sum", "error": "HTTP Error 400: Bad Request"}
+{"task": "three_sum", "error": "HTTP Error 400: Bad Request"}
+{"task": "three_sum", "error": "HTTP Error 400: Bad Request"}
+{"task": "word_count", "error": "HTTP Error 400: Bad Request"}
+{"task": "word_count", "error": "HTTP Error 400: Bad Request"}
+{"task": "word_count", "error": "HTTP Error 400: Bad Request"}
+{"task": "no_tool", "error": "HTTP Error 400: Bad Request"}
+{"task": "no_tool", "error": "HTTP Error 400: Bad Request"}
+{"task": "no_tool", "error": "HTTP Error 400: Bad Request"}

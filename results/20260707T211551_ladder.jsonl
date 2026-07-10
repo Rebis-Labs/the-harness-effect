@@ -1,0 +1,4 @@
+{"MANIFEST": {"run_id": "20260707T211551", "models": ["local"], "rungs": ["h0", "h1", "h2"], "n": 1, "L": 12, "K": 5, "seed0": 1000, "task": "ledger", "note": "ladder: harness fisso-per-rung, modello per-colonna; null = voto compute-matched"}}
+{"model": "local", "rung": "h0", "seed": 1000, "gold": 190, "ans": null, "correct": false, "refused": false, "tok": 4096, "calls": 1}
+{"model": "local", "rung": "h1", "seed": 1000, "gold": 190, "ans": null, "correct": false, "refused": false, "tok": 4096, "calls": 1}
+{"model": "local", "rung": "h2", "seed": 1000, "gold": 190, "ans": null, "correct": false, "refused": false, "tok": 4096, "calls": 1}

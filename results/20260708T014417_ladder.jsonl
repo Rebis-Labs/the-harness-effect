@@ -1,0 +1,11 @@
+{"MANIFEST": {"run_id": "20260708T014417", "models": ["opus"], "rungs": ["h0"], "n": 10, "L": 48, "K": 5, "seed0": 1000, "max_tokens": 8192, "task": "ledger", "note": "ladder: harness fisso-per-rung, modello per-colonna; null = voto compute-matched"}}
+{"model": "opus", "rung": "h0", "seed": 1000, "gold": 148, "ans": 148.0, "correct": true, "refused": false, "trunc": false, "tok": 599, "calls": 1}
+{"model": "opus", "rung": "h0", "seed": 1001, "gold": 40, "ans": 40.0, "correct": true, "refused": false, "trunc": false, "tok": 578, "calls": 1}
+{"model": "opus", "rung": "h0", "seed": 1002, "gold": 82, "ans": 82.0, "correct": true, "refused": false, "trunc": false, "tok": 590, "calls": 1}
+{"model": "opus", "rung": "h0", "seed": 1003, "gold": 53, "ans": 53.0, "correct": true, "refused": false, "trunc": false, "tok": 606, "calls": 1}
+{"model": "opus", "rung": "h0", "seed": 1004, "gold": 134, "ans": 134.0, "correct": true, "refused": false, "trunc": false, "tok": 609, "calls": 1}
+{"model": "opus", "rung": "h0", "seed": 1005, "gold": 76, "ans": 76.0, "correct": true, "refused": false, "trunc": false, "tok": 546, "calls": 1}
+{"model": "opus", "rung": "h0", "seed": 1006, "gold": 190, "ans": 190.0, "correct": true, "refused": false, "trunc": false, "tok": 543, "calls": 1}
+{"model": "opus", "rung": "h0", "seed": 1007, "gold": 252, "ans": 252.0, "correct": true, "refused": false, "trunc": false, "tok": 617, "calls": 1}
+{"model": "opus", "rung": "h0", "seed": 1008, "gold": 114, "ans": 114.0, "correct": true, "refused": false, "trunc": false, "tok": 583, "calls": 1}
+{"model": "opus", "rung": "h0", "seed": 1009, "gold": 123, "ans": 123.0, "correct": true, "refused": false, "trunc": false, "tok": 639, "calls": 1}

@@ -50,8 +50,15 @@ def tool_calc(expr: str) -> str:
     try:
         v = _safe_eval(ast.parse(str(expr), mode="eval").body)
         return str(int(v) if isinstance(v, float) and v.is_integer() else v)
-    except Exception as e:
-        return f"ERROR: {e}"
+    except Exception:
+        # Errore ISTRUTTIVO: è un tool-output → parte dell'harness. Con 'espressione non
+        # consentita' il 14B (chain_mul, 10 lug) vedeva i valori giusti ma si arrendeva
+        # inventando 'sottrazione non consentita' → RISPOSTA: 0, 4/4 a temp=0. Il loop
+        # può auto-correggersi solo se l'errore dice COME. # VERIFIED
+        return (
+            "ERROR: espressione non valida. Usa solo NUMERI e operatori aritmetici "
+            "(es. '(100 - 9) * 3'), non nomi o simboli. Riprova con i valori numerici."
+        )
 
 
 def tool_kv_get(key: str) -> str:

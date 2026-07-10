@@ -1,0 +1,13 @@
+{"MANIFEST": {"run_id": "20260710T154831", "models": ["local"], "rungs": ["h0"], "n": 12, "L": 32, "K": 5, "seed0": 1000, "max_tokens": 8192, "local_model": "qwen/qwen3-14b", "thinking": "off", "timeout_s": 600, "serving": {"qwen/qwen3-14b": {"quant": "Q4_K_M", "arch": "qwen3", "format": "gguf", "ctx_loaded": 16384}}, "task": "ledger", "note": "ladder: harness fisso-per-rung, modello per-colonna; null = voto compute-matched"}}
+{"model": "local", "rung": "h0", "seed": 1000, "gold": 112, "ans": 170.0, "correct": false, "refused": false, "trunc": false, "tok": 702, "tok_in": 699, "ref_partial": 0, "calls": 1}
+{"model": "local", "rung": "h0", "seed": 1001, "gold": 116, "ans": 180.0, "correct": false, "refused": false, "trunc": false, "tok": 809, "tok_in": 688, "ref_partial": 0, "calls": 1}
+{"model": "local", "rung": "h0", "seed": 1002, "gold": 90, "ans": 90.0, "correct": true, "refused": false, "trunc": false, "tok": 1282, "tok_in": 685, "ref_partial": 0, "calls": 1}
+{"model": "local", "rung": "h0", "seed": 1003, "gold": 79, "ans": 135.0, "correct": false, "refused": false, "trunc": false, "tok": 1365, "tok_in": 708, "ref_partial": 0, "calls": 1}
+{"model": "local", "rung": "h0", "seed": 1004, "gold": 117, "ans": 117.0, "correct": true, "refused": false, "trunc": false, "tok": 1016, "tok_in": 694, "ref_partial": 0, "calls": 1}
+{"model": "local", "rung": "h0", "seed": 1005, "gold": 38, "ans": 38.0, "correct": true, "refused": false, "trunc": false, "tok": 796, "tok_in": 705, "ref_partial": 0, "calls": 1}
+{"model": "local", "rung": "h0", "seed": 1006, "gold": 26, "ans": 158.0, "correct": false, "refused": false, "trunc": false, "tok": 974, "tok_in": 691, "ref_partial": 0, "calls": 1}
+{"model": "local", "rung": "h0", "seed": 1007, "gold": 173, "ans": 351.0, "correct": false, "refused": false, "trunc": false, "tok": 1045, "tok_in": 691, "ref_partial": 0, "calls": 1}
+{"model": "local", "rung": "h0", "seed": 1008, "gold": 96, "ans": 117.0, "correct": false, "refused": false, "trunc": false, "tok": 693, "tok_in": 693, "ref_partial": 0, "calls": 1}
+{"model": "local", "rung": "h0", "seed": 1009, "gold": 148, "ans": 148.0, "correct": true, "refused": false, "trunc": false, "tok": 1017, "tok_in": 691, "ref_partial": 0, "calls": 1}
+{"model": "local", "rung": "h0", "seed": 1010, "gold": 12, "ans": 12.0, "correct": true, "refused": false, "trunc": false, "tok": 1446, "tok_in": 694, "ref_partial": 0, "calls": 1}
+{"model": "local", "rung": "h0", "seed": 1011, "gold": -61, "ans": -61.0, "correct": true, "refused": false, "trunc": false, "tok": 761, "tok_in": 703, "ref_partial": 0, "calls": 1}

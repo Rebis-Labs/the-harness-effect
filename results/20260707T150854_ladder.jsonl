@@ -1,0 +1,21 @@
+{"MANIFEST": {"run_id": "20260707T150854", "models": ["local"], "rungs": ["h0"], "n": 20, "L": 12, "K": 5, "seed0": 1000, "task": "ledger", "note": "ladder: harness fisso-per-rung, modello per-colonna; null = voto compute-matched"}}
+{"model": "local", "rung": "h0", "seed": 1000, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1001, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1002, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1003, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1004, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1005, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1006, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1007, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1008, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1009, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1010, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1011, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1012, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1013, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1014, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1015, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1016, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1017, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1018, "error": "timed out"}
+{"model": "local", "rung": "h0", "seed": 1019, "error": "timed out"}
