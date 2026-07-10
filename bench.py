@@ -93,10 +93,12 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     return (max(0.0, (c - hw) / d), min(1.0, (c + hw) / d))
 
 
-def run_suite(name: str, provider, n: int, logf) -> dict:
-    print(f"\n===== {name}  (N={n}) =====")
+def run_suite(name: str, provider, n: int, logf, repair: int = 0) -> dict:
+    print(f"\n===== {name}  (N={n}{f', repair≤{repair}' if repair else ''}) =====")
     agg = {
         "strict": 0,
+        "strict_clean": 0,  # pass SENZA repair — il numero comparabile coi run storici
+        "strict_repaired": 0,  # pass CON repair — capacità del LOOP, mai sommarli ai clean
         "lenient": 0,
         "runs_ok": 0,
         "errors": 0,
@@ -111,10 +113,15 @@ def run_suite(name: str, provider, n: int, logf) -> dict:
     }
     per_task = {}
     for t in TASKS:
-        s = ln = err = ref = 0
+        s = ln = err = ref = rep = 0
         for _ in range(n):
             try:
-                r = run_agent(provider, t["prompt"])
+                r = run_agent(
+                    provider,
+                    t["prompt"],
+                    required_tools=t["expected_tools"],
+                    max_repairs=repair,
+                )
             except Exception as e:  # rete/API già ritentata → ERROR, non FAIL
                 err += 1
                 agg["errors"] += 1
@@ -125,7 +132,10 @@ def run_suite(name: str, provider, n: int, logf) -> dict:
             lenient = score_lenient(r["final"], t["answer"])
             s += strict
             ln += lenient
+            rep += r["repaired"]
             agg["strict"] += strict
+            agg["strict_repaired"] += strict and r["repaired"]
+            agg["strict_clean"] += strict and not r["repaired"]
             agg["lenient"] += lenient
             agg["trunc"] += r["truncated"]
             agg["recov"] += r["recovered_from_reasoning"]
@@ -144,6 +154,8 @@ def run_suite(name: str, provider, n: int, logf) -> dict:
                         "answer": t["answer"],
                         "strict": strict,
                         "lenient": lenient,
+                        "repaired": r["repaired"],
+                        "repair_rounds": r["repair_rounds"],
                         "final": r["final"][:200],
                         "tool_names": r["tool_names"],
                         "turns": r["turns"],
@@ -158,7 +170,8 @@ def run_suite(name: str, provider, n: int, logf) -> dict:
             )
         per_task[t["id"]] = (s, ln, err, ref)
         rf = f" refusal={ref}" if ref else ""
-        print(f"  {t['id']:10} strict={s}/{n} lenient={ln}/{n}{rf} err={err}")
+        rp = f" repaired={rep}" if rep else ""
+        print(f"  {t['id']:10} strict={s}/{n} lenient={ln}/{n}{rf}{rp} err={err}")
     ro = max(1, agg["runs_ok"])
     # Un refusal (safety-classifier decline) NON è una risposta sbagliata: è un TERZO esito.
     # La capacità si misura sulle chiamate TENTATE (answered), il refusal si riporta a parte.
@@ -170,8 +183,15 @@ def run_suite(name: str, provider, n: int, logf) -> dict:
         acc = f"ANSWER-ACC {agg['strict']}/{answered} = {agg['strict'] / answered:.0%} [CI95 {lo:.0%}-{hi:.0%}] | lenient {agg['lenient'] / answered:.0%}"
     else:
         acc = "ANSWER-ACC n/a (tutte rifiutate: 0 chiamate tentate)"
+    # clean vs repaired SEMPRE separati: 'clean' è il numero comparabile coi run storici,
+    # 'repaired' misura il valore del repair loop. La loro somma NON è una metrica. # VERIFIED
+    rep = (
+        f" | strict clean {agg['strict_clean']} + repaired {agg['strict_repaired']} (MAI sommare)"
+        if agg["strict_repaired"]
+        else ""
+    )
     print(
-        f"  ── {name}: {acc} | "
+        f"  ── {name}: {acc}{rep} | "
         f"REFUSAL {agg['refusal']}/{ro} | err {agg['errors']} | trunc {agg['trunc']}/{ro} | recov {agg['recov']}/{ro} | "
         f"traj {agg['traj_ok']}/{max(1, agg['traj_n'])} | "
         f"~{agg['tok_out'] // ro} tok_out | {agg['lat'] / ro:.1f}s/task"
@@ -202,6 +222,21 @@ if __name__ == "__main__":
         action="store_true",
         help="salta la suite LOCAL (lenta) → solo Anthropic",
     )
+    ap.add_argument(
+        "--repair",
+        type=int,
+        default=0,
+        help="max round di repair loop (0=off). I pass riparati sono contati A PARTE.",
+    )
+    ap.add_argument(
+        "--thinking",
+        choices=["on", "off"],
+        default="on",
+        help="off appende /no_think (SOLO locale; con --anthropic resta on, asimmetria dichiarata)",
+    )
+    ap.add_argument(
+        "--timeout", type=int, default=600, help="timeout per chiamata (s), no retry"
+    )
     args = ap.parse_args()
 
     run_id = datetime.now().strftime("%Y%m%dT%H%M%S")
@@ -216,7 +251,11 @@ if __name__ == "__main__":
         "max_tokens": args.max_tokens,
         "temperature": args.temp,
         "reasoning_fallback": not args.no_reasoning_fallback,
-        "note": "locale = Q4 quantizzato + thinking; confronto tra DEPLOYMENT, non modelli ideali",
+        "repair": args.repair,
+        "thinking": args.thinking,
+        "timeout_s": args.timeout,
+        "note": "locale = Q4 quantizzato; thinking/repair = assi harness dichiarati; "
+        "confronto tra DEPLOYMENT, non modelli ideali",
     }
 
     with open(results_dir / f"{run_id}.jsonl", "w") as logf:
@@ -230,11 +269,16 @@ if __name__ == "__main__":
                     temperature=args.temp,
                     max_tokens=args.max_tokens,
                     use_reasoning_fallback=fb,
+                    think=args.thinking == "on",
+                    timeout=args.timeout,
                 ),
                 args.n,
                 logf,
+                repair=args.repair,
             )
         if args.anthropic:
+            # think NON passato: Anthropic è sempre-on (il provider rifiuta think=False);
+            # regime misto locale-off/frontiera-on è VIETATO in ladder, qui è dichiarato nel manifest.
             run_suite(
                 f"ANTHROPIC: {args.anthropic}",
                 AnthropicProvider(
@@ -242,9 +286,11 @@ if __name__ == "__main__":
                     temperature=args.temp,
                     max_tokens=args.max_tokens,
                     use_reasoning_fallback=fb,
+                    timeout=args.timeout,
                 ),
                 args.n,
                 logf,
+                repair=args.repair,
             )
 
     print(f"\nlog completo: results/{run_id}.jsonl  |  manifest: {manifest}")

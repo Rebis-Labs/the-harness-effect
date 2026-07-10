@@ -34,11 +34,13 @@ import collections
 import json
 import os
 import pathlib
-import re
 import urllib.request
 from datetime import datetime
 
-from bench import wilson
+from bench import (
+    wilson,
+    _RISPOSTA as _ANS,
+)  # regex UNICA bench/ladder (stessa semantica di score)
 from harness import (
     NEUTRAL_SYSTEM,
     SYSTEM,
@@ -50,7 +52,6 @@ from harness import (
 import tasks_ledger as task
 
 HERE = pathlib.Path(__file__).parent
-_ANS = re.compile(r"RISPOSTA:\s*(-?\d+(?:\.\d+)?)", re.I)
 
 
 def extract(final: str) -> float | None:
@@ -72,14 +73,18 @@ def _exec(tc: dict) -> str:
 
 
 # ───────────────────────── Rung (ognuno: (ctx, prompt) -> result) ─────────────
-# result = {"final", "tok", "calls", "refused", "trunc"}. ctx = {"cold", "hot", "K"}.
-def _res(final, tok, calls, refused=False, trunc=False):
+# result = {"final", "tok", "calls", "refused", "trunc", "tok_in", "ref_partial"}.
+# ctx = {"cold", "hot", "K"}. NOTA: il compute-matching dei null resta su tok (=output);
+# tok_in è tracciato per trasparenza (il context cresce col loop) ma NON entra nel matching.
+def _res(final, tok, calls, refused=False, trunc=False, tok_in=0, ref_partial=0):
     return {
         "final": final,
         "tok": tok,
         "calls": calls,
         "refused": refused,
         "trunc": trunc,
+        "tok_in": tok_in,
+        "ref_partial": ref_partial,  # rifiuti PARZIALI dentro un voto (0 nei rung singoli)
     }
 
 
@@ -93,20 +98,22 @@ def rung_h0(ctx, prompt):
         r["turns"],
         r["finish_reason"] == "refusal",
         r["truncated"],
+        r["tokens_in"],
     )
 
 
 def rung_h1(ctx, prompt):
     prov = ctx["cold"]
     transcript = [{"role": "user", "text": prompt}]
-    tok = calls = 0
+    tok = calls = tok_in = 0
     trunc = False
     out = prov.call(SYSTEM, transcript, True)  # turno 1: con tool
     calls += 1
     tok += out["usage"]["out"]
+    tok_in += out["usage"]["in"]
     trunc = trunc or out["truncated"]
     if out["finish_reason"] == "refusal":
-        return _res("", tok, calls, True, trunc)
+        return _res("", tok, calls, True, trunc, tok_in)
     transcript.append(
         {"role": "assistant", "text": out["text"], "tool_calls": out["tool_calls"]}
     )
@@ -120,10 +127,11 @@ def rung_h1(ctx, prompt):
         )  # turno 2: SENZA tool → risposta forzata
         calls += 1
         tok += out["usage"]["out"]
+        tok_in += out["usage"]["in"]
         trunc = trunc or out["truncated"]
         if out["finish_reason"] == "refusal":
-            return _res("", tok, calls, True, trunc)
-    return _res(out["text"], tok, calls, False, trunc)
+            return _res("", tok, calls, True, trunc, tok_in)
+    return _res(out["text"], tok, calls, False, trunc, tok_in)
 
 
 def rung_h2(ctx, prompt):
@@ -134,6 +142,7 @@ def rung_h2(ctx, prompt):
         r["turns"],
         r["finish_reason"] == "refusal",
         r["truncated"],
+        r["tokens_in"],
     )
 
 
@@ -148,12 +157,16 @@ def rung_h4(ctx, prompt):
         "Se il risultato precedente è sbagliato, correggilo. Concludi con: RISPOSTA: <numero>."
     )
     v = run_agent(ctx["cold"], vprompt, max_turns=6, system=SYSTEM, tools_enabled=True)
+    # SCELTA DICHIARATA (conservativa): se la base ha rifiutato, il trial conta refused anche
+    # se il passo verify risponde — un h4 che "ripesca" un refusal misurerebbe il guardrail,
+    # non la verifica. Confronto onesto con nullB: usa --K 2 (h4 ≈ 2×h2 di compute). # VERIFIED
     return _res(
         v["final"],
         base["tok"] + v["tokens_out"],
         base["calls"] + v["turns"],
         base["refused"] or v["finish_reason"] == "refusal",
         base["trunc"] or v["truncated"],
+        base["tok_in"] + v["tokens_in"],
     )
 
 
@@ -169,18 +182,22 @@ def rung_p(ctx, prompt):
         r["turns"],
         r["finish_reason"] == "refusal",
         r["truncated"],
+        r["tokens_in"],
     )
 
 
 def _vote(base_fn, ctx, prompt):
     """Voto self-consistency a maggioranza su base_fn, K campioni col provider HOT (temp>0).
-    Ties = SBAGLIATO (conservativo). Somma token/chiamate → confronto compute onesto."""
+    Ties = SBAGLIATO (conservativo). Somma token/chiamate → confronto compute onesto.
+    ref_partial: rifiuti DENTRO il voto quando non sono K/K — prima erano invisibili (il null
+    votava su 4/5 campioni senza traccia; con Fable ~20% refusal stocastico è sistematico)."""
     hot_ctx = {"cold": ctx["hot"], "hot": ctx["hot"], "K": ctx["K"]}
-    votes, tok, calls, refused, trunc = [], 0, 0, 0, False
+    votes, tok, calls, refused, trunc, tok_in = [], 0, 0, 0, False, 0
     for _ in range(ctx["K"]):
         r = base_fn(hot_ctx, prompt)
         tok += r["tok"]
         calls += r["calls"]
+        tok_in += r["tok_in"]
         trunc = trunc or r["trunc"]
         if r["refused"]:
             refused += 1
@@ -189,14 +206,16 @@ def _vote(base_fn, ctx, prompt):
         if a is not None:
             votes.append(a)
     if not votes:
-        return _res("", tok, calls, refused == ctx["K"], trunc)
+        return _res(
+            "", tok, calls, refused == ctx["K"], trunc, tok_in, ref_partial=refused
+        )
     cnt = collections.Counter(votes)
     top, n = cnt.most_common(1)[0]
     tie = sum(1 for _, c in cnt.items() if c == n) > 1
     final = (
         "" if tie else f"RISPOSTA: {top:g}"
     )  # tie → nessuna risposta → conta sbagliato
-    return _res(final, tok, calls, False, trunc)
+    return _res(final, tok, calls, False, trunc, tok_in, ref_partial=refused)
 
 
 def rung_nullA(ctx, prompt):
@@ -219,34 +238,57 @@ RUNGS = {
 
 
 # ───────────────────────── Providers per modello ─────────────────────────
-def make_providers(model: str, max_tokens: int = 8192):
+def make_providers(
+    model: str,
+    max_tokens: int = 8192,
+    local_model: str = "qwen/qwen3-14b",
+    think: bool = True,
+    timeout: int = 600,
+):
     """Ritorna (cold temp=0, hot temp>0). max_tokens ALTO (8192): il 32B pensa molto sul ledger
     duro e a 4096 troncava PRIMA di chiamare un tool o emettere RISPOSTA (canary 7 lug) → confound
     di truncation. Frontiera: temperature RIMOSSA su Fable/Opus → hot≈cold (diversità dal thinking
-    non-deterministico, non da temp). # VERIFIED"""
+    non-deterministico, non da temp). think/timeout: assi dell'harness, dichiarati nel manifest;
+    think=False vale SOLO per il locale (AnthropicProvider lo rifiuta, asimmetria dichiarata). # VERIFIED"""
     if model == "local":
         return (
             OpenAIProvider(
-                model="qwen/qwen3-14b", temperature=0.0, max_tokens=max_tokens
+                model=local_model,
+                temperature=0.0,
+                max_tokens=max_tokens,
+                think=think,
+                timeout=timeout,
             ),
             OpenAIProvider(
-                model="qwen/qwen3-14b", temperature=0.7, max_tokens=max_tokens
+                model=local_model,
+                temperature=0.7,
+                max_tokens=max_tokens,
+                think=think,
+                timeout=timeout,
             ),
         )
     if model == "fable":
         return (
-            AnthropicProvider(model="claude-fable-5", max_tokens=max_tokens),
-            AnthropicProvider(model="claude-fable-5", max_tokens=max_tokens),
+            AnthropicProvider(
+                model="claude-fable-5", max_tokens=max_tokens, timeout=timeout
+            ),
+            AnthropicProvider(
+                model="claude-fable-5", max_tokens=max_tokens, timeout=timeout
+            ),
         )
     if model == "opus":
         return (
-            AnthropicProvider(model="claude-opus-4-8", max_tokens=max_tokens),
-            AnthropicProvider(model="claude-opus-4-8", max_tokens=max_tokens),
+            AnthropicProvider(
+                model="claude-opus-4-8", max_tokens=max_tokens, timeout=timeout
+            ),
+            AnthropicProvider(
+                model="claude-opus-4-8", max_tokens=max_tokens, timeout=timeout
+            ),
         )
     raise ValueError(f"modello sconosciuto: {model} (local|fable|opus)")
 
 
-def preflight(models, local_model="qwen/qwen3-14b"):
+def preflight(models, local_model="qwen/qwen3-14b", think=True):
     """Fallisce SUBITO (non dopo 30 min di timeout×retry) se un modello non è raggiungibile.
     Il canary 7 lug è caduto per server locale su-ma-modello-scarico: questo lo becca in 5s."""
     problems = []
@@ -294,14 +336,60 @@ def preflight(models, local_model="qwen/qwen3-14b"):
         problems.append(
             "ANTHROPIC_API_KEY mancante nell'ambiente ma richiesta per fable/opus."
         )
+    if not think and ("fable" in models or "opus" in models):
+        problems.append(
+            "thinking=off richiesto con fable/opus: non supportato (thinking sempre-on "
+            "lato Anthropic). Regola anti-confound: mai mescolare regimi in un run — "
+            "lancia il locale think=off e la frontiera think=on come DUE run/manifest."
+        )
     return problems
 
 
+def serving_info() -> dict:
+    """Fotografa il deployment di serving locale per il manifest (best-effort).
+    Endpoint REST LM Studio /api/v0/models: probato 10 lug, ritorna quantization/arch/
+    context del modello caricato. Se irraggiungibile → {} (mai bloccare il run). # VERIFIED"""
+    try:
+        with urllib.request.urlopen(
+            "http://localhost:1234/api/v0/models", timeout=5
+        ) as r:
+            data = json.loads(r.read()).get("data", [])
+        return {
+            m["id"]: {
+                "quant": m.get("quantization"),
+                "arch": m.get("arch"),
+                "format": m.get("compatibility_type"),
+                "ctx_loaded": m.get("loaded_context_length"),
+            }
+            for m in data
+            if m.get("state") == "loaded"
+        }
+    except Exception:
+        return {}
+
+
 # ───────────────────────── Driver ─────────────────────────
-def run_experiment(models, rung_names, seeds, L, K, logf, max_tokens=8192):
+def run_experiment(
+    models,
+    rung_names,
+    seeds,
+    L,
+    K,
+    logf,
+    max_tokens=8192,
+    local_model="qwen/qwen3-14b",
+    think=True,
+    timeout=600,
+):
     results = {}  # (model, rung) -> list of trial dicts
     for model in models:
-        cold, hot = make_providers(model, max_tokens=max_tokens)
+        cold, hot = make_providers(
+            model,
+            max_tokens=max_tokens,
+            local_model=local_model,
+            think=think,
+            timeout=timeout,
+        )
         ctx = {"cold": cold, "hot": hot, "K": K}
         print(f"\n════════ MODELLO: {model} ════════")
         for rname in rung_names:
@@ -313,6 +401,10 @@ def run_experiment(models, rung_names, seeds, L, K, logf, max_tokens=8192):
                     r = fn(ctx, prompt)
                 except Exception as e:  # rete/API già ritentata → ERROR (non FAIL)
                     print(f"  {rname:6} seed={seed} ERROR {e}")
+                    # l'errore ENTRA nei trial (marcato) → _agg lo conta e lo stampa.
+                    # Prima veniva solo loggato e sparire dal riepilogo = 'acc 0/0' muto
+                    # (run 20260707T150854: 20/20 timeout invisibili). Empty = failure. # VERIFIED
+                    trials.append({"error": str(e)})
                     logf.write(
                         json.dumps(
                             {
@@ -340,6 +432,8 @@ def run_experiment(models, rung_names, seeds, L, K, logf, max_tokens=8192):
                             "refused": r["refused"],
                             "trunc": r["trunc"],
                             "tok": r["tok"],
+                            "tok_in": r["tok_in"],
+                            "ref_partial": r["ref_partial"],
                             "calls": r["calls"],
                         }
                     )
@@ -351,14 +445,17 @@ def run_experiment(models, rung_names, seeds, L, K, logf, max_tokens=8192):
 
 
 def _agg(trials):
-    ok = [t for t in trials if not t["refused"]]
+    errs = [t for t in trials if t.get("error")]
+    done = [t for t in trials if not t.get("error")]
+    ok = [t for t in done if not t["refused"]]
     n = len(ok)
     k = sum(t["correct"] for t in ok)
-    ref = sum(t["refused"] for t in trials)
-    trunc = sum(t.get("trunc") for t in trials)
+    ref = sum(t["refused"] for t in done)
+    ref_p = sum(t.get("ref_partial", 0) for t in done)
+    trunc = sum(t.get("trunc") for t in done)
     lo, hi = wilson(k, n) if n else (0.0, 0.0)
-    tok = sum(t["tok"] for t in trials) / max(1, len(trials))
-    calls = sum(t["calls"] for t in trials) / max(1, len(trials))
+    tok = sum(t["tok"] for t in done) / max(1, len(done))
+    calls = sum(t["calls"] for t in done) / max(1, len(done))
     return {
         "n": n,
         "k": k,
@@ -366,7 +463,9 @@ def _agg(trials):
         "lo": lo,
         "hi": hi,
         "ref": ref,
+        "ref_partial": ref_p,
         "trunc": trunc,
+        "err": len(errs),
         "N": len(trials),
         "tok": tok,
         "calls": calls,
@@ -376,11 +475,14 @@ def _agg(trials):
 def _print_rung(model, rname, trials):
     a = _agg(trials)
     ref = f" refused={a['ref']}" if a["ref"] else ""
+    refp = f" ref_partial={a['ref_partial']}" if a["ref_partial"] else ""
+    # ⚠️ error = trial MAI completato (timeout/rete): se >0 il rung è sotto-campionato, MAI 'acc 0/0' muto
+    er = f"  ⚠️ERR {a['err']}/{a['N']}" if a["err"] else ""
     # ⚠️ truncation = confound: se >0, il numero NON è affidabile (alza --max-tokens)
     tr = f"  ⚠️TRUNC {a['trunc']}/{a['N']}" if a["trunc"] else ""
     print(
         f"  {rname:6} acc {a['k']}/{a['n']} = {a['acc']:.0%} [CI {a['lo']:.0%}-{a['hi']:.0%}]"
-        f"  ~{a['tok']:.0f} tok  {a['calls']:.1f} calls{ref}{tr}"
+        f"  ~{a['tok']:.0f} tok  {a['calls']:.1f} calls{ref}{refp}{er}{tr}"
     )
 
 
@@ -394,6 +496,14 @@ def _verdict(name_hi, hi, name_lo, lo):
         f"    {name_hi} vs {name_lo}: {hi['acc']:.0%} @~{hi['tok']:.0f}tok  vs  "
         f"{lo['acc']:.0%} @~{lo['tok']:.0f}tok  →  {rel}"
     )
+    # onestà sul compute-matching: se un lato spende >1.5× i token dell'altro il verdetto
+    # '=compute' non è affidabile (es. nullB con K=5 ≈ 2.5× h4 → tara con --K 2). # VERIFIED
+    big, small = max(hi["tok"], lo["tok"]), max(1.0, min(hi["tok"], lo["tok"]))
+    if big / small > 1.5:
+        print(
+            f"    ⚠️ compute-mismatch: {big / small:.1f}× di divario token tra i due lati — "
+            "verdetto compute-matched non affidabile (tara K/il budget prima di leggerlo)"
+        )
 
 
 def print_plane(models, rung_names, results):
@@ -436,6 +546,24 @@ if __name__ == "__main__":
         "--seed0", type=int, default=1000, help="primo seed (istanze = seed0..seed0+n)"
     )
     ap.add_argument(
+        "--local-model",
+        default="qwen/qwen3-14b",
+        help="id del modello locale (prima hardcoded)",
+    )
+    ap.add_argument(
+        "--thinking",
+        choices=["on", "off"],
+        default="on",
+        help="asse harness: off appende /no_think (solo locale). MAI mescolare regimi in un "
+        "run; on-vs-off = due run/manifest. Default on = comparabile coi run 6-8 lug.",
+    )
+    ap.add_argument(
+        "--timeout",
+        type=int,
+        default=600,
+        help="timeout per singola chiamata (s); i timeout NON vengono ritentati",
+    )
+    ap.add_argument(
         "--canary", action="store_true", help="1 istanza, h0/h1/h2, solo locale"
     )
     ap.add_argument(
@@ -443,7 +571,13 @@ if __name__ == "__main__":
     )
     args = ap.parse_args()
 
+    think = args.thinking == "on"
     if args.canary:
+        if args.models != "local" or args.rungs != "h0,h1,h2,nullA":
+            print(
+                f"⚠️ --canary SOVRASCRIVE --models/--rungs → local, h0/h1/h2 (ignorati: "
+                f"--models {args.models} --rungs {args.rungs})"
+            )
         models, rung_names, n = ["local"], ["h0", "h1", "h2"], 1
     elif args.pilot:
         models, rung_names, n = args.models.split(","), ["h0"], args.n
@@ -453,7 +587,7 @@ if __name__ == "__main__":
         n = args.n
     seeds = list(range(args.seed0, args.seed0 + n))
 
-    probs = preflight(models)
+    probs = preflight(models, local_model=args.local_model, think=think)
     if probs:
         print("❌ PRE-FLIGHT fallito — niente run:")
         for p in probs:
@@ -471,6 +605,10 @@ if __name__ == "__main__":
         "K": args.K,
         "seed0": args.seed0,
         "max_tokens": args.max_tokens,
+        "local_model": args.local_model,
+        "thinking": args.thinking,
+        "timeout_s": args.timeout,
+        "serving": serving_info(),  # quant/arch/ctx del deployment locale (prima: invisibile)
         "task": "ledger",
         "note": "ladder: harness fisso-per-rung, modello per-colonna; null = voto compute-matched",
     }
@@ -478,7 +616,16 @@ if __name__ == "__main__":
     with open(HERE / "results" / f"{run_id}_ladder.jsonl", "w") as logf:
         logf.write(json.dumps({"MANIFEST": manifest}) + "\n")
         results = run_experiment(
-            models, rung_names, seeds, args.L, args.K, logf, max_tokens=args.max_tokens
+            models,
+            rung_names,
+            seeds,
+            args.L,
+            args.K,
+            logf,
+            max_tokens=args.max_tokens,
+            local_model=args.local_model,
+            think=think,
+            timeout=args.timeout,
         )
         print_plane(models, rung_names, results)
     print(f"\nlog: results/{run_id}_ladder.jsonl")

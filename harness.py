@@ -102,11 +102,23 @@ _TOOL_FN = {t["name"]: t["fn"] for t in TOOLS}
 
 
 # ───────────────────────── HTTP helper (retry + backoff) ─────────────────────────
+def _is_timeout(e: Exception) -> bool:
+    # urlopen può segnalare il timeout come TimeoutError diretto O come URLError(reason=timeout)
+    return isinstance(e, TimeoutError) or (
+        isinstance(e, urllib.error.URLError)
+        and isinstance(getattr(e, "reason", None), TimeoutError)
+    )
+
+
 def _post(
     url: str, payload: dict, headers: dict, timeout: int = 600, retries: int = 3
 ) -> dict:
-    # 600s: un 32B locale con thinking lungo sul task più duro supera i 240s → altrimenti
+    # 600s default: un 32B locale con thinking lungo sul task più duro supera i 240s → altrimenti
     # slow-ma-corretto viene classificato ERROR (visto su three_sum, run 20260706T140929). # VERIFIED
+    # I TIMEOUT NON SI RITENTANO: per il provider cold (temp=0) la ri-chiamata è ~identica →
+    # 3×600s persi per run (i 20/20 'timed out' del run 20260707T150854 hanno pagato il triplo);
+    # per il provider hot (temp>0) il retry potrebbe riuscire, ma il no-retry resta giusto per
+    # COSTO (il timeout segnala thinking fuori budget, non un guasto transitorio). # VERIFIED
     data = json.dumps(payload).encode()
     last = None
     for attempt in range(retries):
@@ -123,6 +135,8 @@ def _post(
                 continue
             raise
         except (urllib.error.URLError, TimeoutError) as e:
+            if _is_timeout(e):
+                raise  # timeout → subito visibile come ERROR, niente retry
             last = e
             if attempt < retries - 1:
                 time.sleep(2**attempt)
@@ -147,10 +161,20 @@ class OpenAIProvider:
         temperature: float = 0.0,
         max_tokens: int = 4096,
         use_reasoning_fallback: bool = True,
+        think: bool = True,
+        timeout: int = 600,
     ):
+        # think=False → appende '/no_think' al system: soft-switch NATIVO di Qwen3, spegne il
+        # thinking a livello modello. Smoke-test 10 lug su qwen3-14b: 15.8s/455tok/1124 reasoning
+        # chars → 3.9s/109tok/0 reasoning, risposta invariata (190). L'alternativa
+        # chat_template_kwargs={'enable_thinking':False} NON ha effetto sull'endpoint OpenAI
+        # della versione LM Studio installata (probato: output identico al baseline) → non usata. # VERIFIED
+        # È un asse dell'HARNESS: va dichiarato nel manifest, mai mescolato on/off in un run.
         self.model, self.base_url, self.api_key = model, base_url, api_key
         self.temperature, self.max_tokens = temperature, max_tokens
         self.use_reasoning_fallback = use_reasoning_fallback
+        self.think = think
+        self.timeout = timeout
 
     def sampling(self) -> dict:
         # pinnati per riproducibilità (repeat_penalty è estensione LM Studio, ignorata da OpenAI vero)
@@ -161,6 +185,10 @@ class OpenAIProvider:
         }
 
     def _messages(self, system: str, transcript: list) -> list:
+        if not self.think:
+            system = (
+                system + " /no_think"
+            )  # a livello provider → uniforme su TUTTI i rung
         msgs = [{"role": "system", "content": system}]
         for m in transcript:
             if m["role"] == "user":
@@ -211,6 +239,7 @@ class OpenAIProvider:
             f"{self.base_url}/chat/completions",
             payload,
             {"Authorization": f"Bearer {self.api_key}"},
+            timeout=self.timeout,
         )
         choice = resp["choices"][0]
         msg = choice["message"]
@@ -257,6 +286,8 @@ class AnthropicProvider:
         temperature: float = 0.0,
         max_tokens: int = 4096,
         use_reasoning_fallback: bool = True,
+        think: bool = True,
+        timeout: int = 600,
     ):
         self.model = model
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
@@ -264,6 +295,15 @@ class AnthropicProvider:
         self.use_reasoning_fallback = (
             use_reasoning_fallback  # non usato lato Anthropic; simmetria d'interfaccia
         )
+        # think=False NON è supportato lato Anthropic (Fable/Opus 4.7+: thinking sempre-on,
+        # /no_think è un token Qwen senza effetto) → chi orchestra deve FALLIRE il preflight
+        # se chiede thinking-off su fable/opus. Asimmetria dichiarata, come per temperature. # VERIFIED
+        if not think:
+            raise ValueError(
+                "thinking-off non disponibile su Anthropic (sempre-on) — "
+                "usa solo modelli locali nel regime think=off"
+            )
+        self.timeout = timeout
 
     def sampling(self) -> dict:
         # Fable 5 / Opus 4.7+ / Sonnet 5: temperature/top_p/top_k RIMOSSI → 400 se inviati
@@ -338,6 +378,7 @@ class AnthropicProvider:
             "https://api.anthropic.com/v1/messages",
             payload,
             {"x-api-key": self.api_key, "anthropic-version": "2023-06-01"},
+            timeout=self.timeout,
         )
         text, tcs = "", []
         for block in resp.get("content", []):
@@ -385,6 +426,13 @@ NEUTRAL_SYSTEM = (
     "Ragiona con attenzione e concludi la risposta con una riga: RISPOSTA: <numero>."
 )
 
+# REPAIR_MSG: iniettato quando il modello risponde SENZA i tool richiesti (repair loop, README:
+# lever promesso per three_sum). Wording NEUTRO (lezione v5: niente framing eval/database → cyber).
+REPAIR_MSG = (
+    "Non hai usato i tool richiesti. Ottieni i valori con i tool disponibili, "
+    "rifai il calcolo con precisione e concludi con una riga: RISPOSTA: <numero>."
+)
+
 
 def run_agent(
     provider,
@@ -392,15 +440,24 @@ def run_agent(
     max_turns: int = 6,
     system: str = SYSTEM,
     tools_enabled: bool = True,
+    required_tools: set | None = None,
+    max_repairs: int = 0,
 ) -> dict:
     """Esegue un task. Ritorna metriche complete. Non solleva su errori-modello (li logga);
     solleva solo su errori di rete/API già ritentati (li conta come ERROR, non FAIL).
-    system/tools_enabled: giunture per la ladder (H0 = NEUTRAL_SYSTEM + tools_enabled=False)."""
+    system/tools_enabled: giunture per la ladder (H0 = NEUTRAL_SYSTEM + tools_enabled=False).
+
+    REPAIR LOOP (default OFF, max_repairs=0 = comportamento identico a prima):
+    se il modello risponde senza aver usato required_tools → re-inietta REPAIR_MSG e riprova,
+    al massimo max_repairs volte, dentro il budget max_turns. Il refusal NON si ripara MAI
+    (coercizione ≠ correzione; e ri-provocare un guardrail inquina la misura del refusal-rate).
+    I pass riparati sono TAGGATI (repaired/repair_rounds) — mai sommarli ai pass lisci."""
     transcript = [{"role": "user", "text": task_prompt}]
     tool_names: list[str] = []
     tokens_in = tokens_out = 0
     truncated = recovered = False
     last_finish = None
+    repair_rounds = 0
     t0 = time.perf_counter()
     for turn in range(max_turns):
         out = provider.call(system, transcript, tools_enabled)
@@ -413,6 +470,19 @@ def run_agent(
             {"role": "assistant", "text": out["text"], "tool_calls": out["tool_calls"]}
         )
         if not out["tool_calls"]:
+            needs_repair = (
+                max_repairs > 0
+                and repair_rounds < max_repairs
+                and required_tools is not None
+                and not required_tools.issubset(set(tool_names))
+                and out["finish_reason"] != "refusal"
+                and turn + 1
+                < max_turns  # serve almeno un turno per la risposta riparata
+            )
+            if needs_repair:
+                repair_rounds += 1
+                transcript.append({"role": "user", "text": REPAIR_MSG})
+                continue
             return _result(
                 out["text"],
                 turn + 1,
@@ -424,6 +494,7 @@ def run_agent(
                 t0,
                 transcript,
                 last_finish,
+                repair_rounds,
             )
         for tc in out["tool_calls"]:
             tool_names.append(tc["name"])
@@ -446,6 +517,7 @@ def run_agent(
         t0,
         transcript,
         last_finish,
+        repair_rounds,
     )
 
 
@@ -460,6 +532,7 @@ def _result(
     t0,
     transcript,
     finish=None,
+    repair_rounds=0,
 ) -> dict:
     return {
         "final": final,
@@ -471,6 +544,8 @@ def _result(
         "truncated": truncated,
         "recovered_from_reasoning": recovered,
         "finish_reason": finish,  # stop_reason raw: end_turn / tool_use / refusal / max_tokens
+        "repaired": repair_rounds > 0,  # pass riparato ≠ pass liscio: mai sommarli
+        "repair_rounds": repair_rounds,
         "latency_s": round(time.perf_counter() - t0, 2),
         "transcript": transcript,
     }
