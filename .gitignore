@@ -9,3 +9,6 @@ __pycache__/
 .DS_Store
 
 # results restano tracciati (sono il record sperimentale) — NON ignorare results/
+
+# secrets
+.env
