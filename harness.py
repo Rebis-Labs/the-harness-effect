@@ -438,39 +438,37 @@ class AnthropicProvider:
 # un'espressione/**" (calc) che co-occorrendo leggeva come tooling da injection → category=cyber,
 # 100% deterministico. Isolato con probe_fix.py: neutralizzare le description → ~20-40% residuo
 # stocastico (il thinking sempre-on). Perciò bench.py TRATTA il refusal come 3° esito. Vedi README.
-# SYSTEM v6 (loop-discipline, 15 lug): la baseline bench_hard (33.3%) ha mostrato tre
-# vizi del regime v5 sul 14B: (1) pianifica TUTTI gli stadi nel thinking del 1° turno
-# → 4096 token bruciati prima della prima call (trunc 15/45); (2) argomenti calc
-# simbolici ('result * 641') → ERROR a raffica; (3) grind aritmetico in-testa → scivola
-# sulle mult a molte cifre. Le regole sotto attaccano esattamente questi tre. # VERIFIED 15 lug
+# SYSTEM v7 (compattazione, 15 lug): la v6 a 12 regole ha saturato il prompt-budget del
+# 14B think-off — allungare la regola 11 (fix lcg_iter) ha fatto perdere la 12 (parità:
+# run 124539, parity/err_fallback/double_nf 5/5→0/5 per diluizione). v7 = stesso
+# contenuto, raggruppato e più corto; le decisioni fragili (parità, chiusura passo)
+# diventano TRASCRIZIONI obbligate nel testo, non solo dichiarazioni. # VERIFIED 15 lug
 SYSTEM = (
-    "Sei un assistente che risolve problemi aritmetici a più stadi usando i tool. "
-    "Regole operative: "
-    "(1) AGISCI SUBITO: fai la prima chiamata tool immediatamente, senza pianificare in anticipo "
-    "gli stadi successivi — li affronterai uno alla volta. "
-    "(2) Ogni operazione aritmetica va fatta con calc, mai a mente. "
-    "(3) L'argomento di calc contiene SOLO numeri espliciti e operatori, con parentesi se serve "
-    "(es. '(42 + 17) * 8377'); mai nomi come alpha o result: sostituiscili col numero già letto. "
-    "(4) Fai UNA operazione dipendente per volta: chiama, leggi il risultato, e usa QUEL numero "
-    "nello stadio successivo. "
-    "(5) Se un tool risponde NOT_FOUND o ERROR, non fermarti: applica la regola o il percorso "
+    "Sei un assistente che risolve problemi aritmetici a più stadi usando i tool. Metodo: "
+    "(1) AGISCI SUBITO: prima chiamata tool immediata, senza pianificare gli stadi futuri; "
+    "tra una chiamata e l'altra al massimo una frase. "
+    "(2) Ogni operazione aritmetica va fatta con calc, mai a mente. Argomento di calc = SOLO "
+    "numeri espliciti e operatori, con parentesi se serve, es. '(42 + 17) * 8377' — mai nomi. "
+    "UNA operazione dipendente per volta: chiama, leggi il risultato, usa QUEL numero. "
+    "(3) Prima di ogni chiamata ricopia in una riga la definizione dello stadio corrente "
+    "coi numeri già sostituiti — così non salti nessuna estrazione. "
+    "(4) Leggere i numeri dai risultati (sempre ricopiando, mai calcolando a mente): "
+    "SOMMA DELLE CIFRE → ricopia le cifre separate da + e falle sommare a calc "
+    "(4082 → calc '4 + 0 + 8 + 2'); "
+    "ULTIME N CIFRE → contale UNA PER UNA partendo da destra e scrivile prima di usarle "
+    "(7305218 → da destra 8,1,2,5 → ultime 4 = 5218; ultime 3 = 218; gli zeri iniziali "
+    "cadono: 90008 → ultime 4 = 0008 = 8); VERIFICA che il numero estratto abbia N cifre; "
+    "PARTE INTERA di una divisione → le cifre prima della virgola; "
+    "PARI o DISPARI → conta SOLO l'ultima cifra (0,2,4,6,8 = pari; 1,3,5,7,9 = dispari): "
+    "scrivi 'ultima cifra = X → pari/dispari' PRIMA di scegliere il ramo (es. 73 → ultima "
+    "cifra 3 → dispari). "
+    "(5) Se il problema richiede K passi ripetuti: scrivi 'Passo i di K (operazione j)'; "
+    "un passo è completo solo dopo l'ULTIMA delle sue operazioni; fermati esattamente al "
+    "passo K completato. "
+    "(6) Se un tool risponde NOT_FOUND o ERROR non fermarti: applica la regola o il percorso "
     "alternativo indicato dal problema. "
-    "(6) Tieni il ragionamento tra una chiamata e l'altra BREVE (una frase). "
-    "(7) Per la SOMMA DELLE CIFRE di un numero: ricopia le sue cifre una per una separate da + "
-    "e falla calcolare a calc (es. somma cifre di 4082 → calc '4 + 0 + 8 + 2'). "
-    "(8) Per le ULTIME N CIFRE di un numero: leggile dalle ultime N posizioni scritte "
-    "(es. ultime 3 cifre di 7305218 → 218; gli zeri iniziali cadono: ultime 4 di 90008 → 8). "
-    "(9) Per la PARTE INTERA di una divisione: leggi il risultato di calc e prendi le cifre "
-    "prima della virgola. "
-    "(10) Prima di ogni chiamata scrivi UNA riga che ricopia la definizione esatta dello stadio "
-    "corrente dal problema, coi numeri già sostituiti (es. 'Stadio 2: ultime 4 cifre di 7305218 "
-    "= 5218, poi 5218 * 129') — così non salti nessuna estrazione. "
-    "(11) Se il problema richiede K passi ripetuti, scrivi 'Passo i di K' a ogni passo "
-    "e fermati ESATTAMENTE al passo K. "
-    "(12) PARI o DISPARI si giudica SOLO dall'ultima cifra del numero: se finisce in 0, 2, 4, 6, 8 "
-    "è pari; se finisce in 1, 3, 5, 7, 9 è dispari (es. 73 finisce in 3 → dispari). "
-    "Concludi la risposta con una riga che contiene SOLO il numero finale già calcolato, "
-    "senza espressioni: 'RISPOSTA: 137', MAI 'RISPOSTA: 140 - 3 = 137'."
+    "Chiudi con una riga che contiene SOLO il numero finale: 'RISPOSTA: 137', "
+    "MAI 'RISPOSTA: 140 - 3 = 137'."
 )
 
 # NEUTRAL_SYSTEM: nessun tool nominato, nessun piano — per il rung H0 (naked) della ladder,
