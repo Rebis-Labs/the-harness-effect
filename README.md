@@ -136,3 +136,16 @@ Design: workflow 3-ricerche + critica avversaria (che ha bocciato KV-quant/specu
 ## Estensioni naturali (se e quando)
 - Terzo provider = OpenRouter → confronti Qwen locale vs Qwen-cloud vs Fable a parità di harness (isola anche la quantizzazione).
 - Variare l'HARNESS (system prompt, n tool, retry) tenendo il modello fisso → misura il *contributo dell'harness* (l'altra metà dell'1,6%).
+
+## bench_hard — harness-engineering sul 14B (15 lug 2026): 33% → 89% a modello fisso
+La prova più forte finora di `capacità = modello × harness`, stavolta nella direzione "harness povero → harness giusto" su task DURI. `bench_hard.py`: 9 task tool-use congelati (catene di 5-9 stadi dipendenti con **joint di estrazione-cifre** che obbligano un round-trip reale per stadio, mult 7×7 cifre, 3 task di recovery da tool-error, distrattori kv, condizionale su parità, iterazione con stato a 8 passi). Modello fisso `qwen/qwen3-14b`, temp=0, N=5, scorer strict invariato.
+
+| Harness | ANSWER-ACC | Note |
+|---|---|---|
+| v5 (think-on, max_turns=6, max_tokens=4096) | **15/45 = 33.3%** [CI 21-48] | trunc 15/45 (thinking brucia 4096 tok PRIMA della 1ª call), MAX_TURNS 5/45, grind in-testa che scivola |
+| v6 (think-OFF + 12 regole + max_turns=32 + continue-nudge) | **40/45 = 88.9%** [CI 76-95] | +55.6pp; Wilson lower 76.5% ≫ baseline point 33.3%; 5× più veloce (35s vs 182s/task) |
+
+- **Il colpo di scena**: il thinking — che sui task facili è il superpotere del 14B (v1-v3 del bench: 100%, macinava in-testa mult 6×3 cifre e LCG a 12 passi) — sui task lunghi è il SABOTATORE: pianifica tutto nel 1° turno, esaurisce il budget token, e quando sopravvive predice in-testa gli argomenti invece di leggere i risultati. `/no_think` + disciplina esplicita nel system prompt ("una operazione dipendente per volta, leggi il risultato, ricopia lo stadio, somma-cifre per trascrizione, parità dall'ultima cifra") = il transcript DIVENTA la working memory. Externalized cognition, misurata.
+- **Leve v6** (tutte harness, zero tocchi a task/scorer/modello): asse thinking off · max_turns 6→32 · SYSTEM 12 regole trascrittive · kv_get documenta NOT_FOUND · calc esplicita "solo numeri espliciti" · ERROR div-zero dedicato · CONTINUE-nudge loop (un messaggio senza call né RISPOSTA non chiude il task).
+- **Residuo onesto**: `lcg_iter` 0/5 anche in v6 (contatore di 8 iterazioni senza thinking: si perde o sbaglia un passo) → il bench non è saturo, c'è headroom per la prossima leva (candidato: contatore di passi iniettato dal loop).
+- Storia indurimento in `bench_hard.py` (v1 100% → v4 33%): il 14B con thinking batcha decine di call PREDICENDO gli argomenti e collassa catene simboliche — i task per essere duri devono forzare la lettura del valore reale (joint di cifre).

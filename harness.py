@@ -50,6 +50,14 @@ def tool_calc(expr: str) -> str:
     try:
         v = _safe_eval(ast.parse(str(expr), mode="eval").body)
         return str(int(v) if isinstance(v, float) and v.is_integer() else v)
+    except ZeroDivisionError:
+        # v6: la divisione per zero NON è "espressione non valida" (l'espressione era
+        # numerica e ben formata) — il messaggio generico depistava il recovery del task
+        # div_zero (bench_hard baseline 0/5). L'errore deve dire COSA è successo. # VERIFIED 15 lug
+        return (
+            "ERROR: divisione per zero. L'espressione è aritmeticamente impossibile: "
+            "se il problema prevede questo caso, segui il percorso alternativo indicato."
+        )
     except Exception:
         # Errore ISTRUTTIVO: è un tool-output → parte dell'harness. Con 'espressione non
         # consentita' il 14B (chain_mul, 10 lug) vedeva i valori giusti ma si arrendeva
@@ -57,7 +65,8 @@ def tool_calc(expr: str) -> str:
         # può auto-correggersi solo se l'errore dice COME. # VERIFIED
         return (
             "ERROR: espressione non valida. Usa solo NUMERI e operatori aritmetici "
-            "(es. '(100 - 9) * 3'), non nomi o simboli. Riprova con i valori numerici."
+            "(es. '(100 - 9) * 3'), non nomi o simboli come 'result' o 'alpha'. "
+            "Sostituisci ogni nome col numero già ottenuto e riprova."
         )
 
 
@@ -74,7 +83,13 @@ TOOLS = [
         "name": "kv_get",
         # v5: "database/chiave" rimosso — con calc "valuta espressione" faceva scattare il
         # classificatore CYBER di Fable (100% refusal). Vedi probe_fix.py + README. # VERIFIED 6 lug
-        "description": "Restituisce il numero associato a un nome. Nomi validi: alpha, beta, gamma, delta.",
+        # v6: documentato NOT_FOUND — il modello deve aspettarselo e applicare la regola
+        # del problema invece di ri-tentare o bloccarsi (bench_hard: recovery-task). Wording
+        # neutro mantenuto (niente "database"/"chiave").
+        "description": (
+            "Restituisce il numero associato a un nome. Nomi validi: alpha, beta, gamma, delta. "
+            "Se il nome non esiste risponde NOT_FOUND: in quel caso applica la regola prevista dal problema."
+        ),
         "parameters": {
             "type": "object",
             "properties": {"key": {"type": "string"}},
@@ -86,7 +101,13 @@ TOOLS = [
         "name": "calc",
         # v5: "valuta un'espressione / **" rimosso (leggeva come code-eval → cyber). L'argomento
         # resta una stringa-espressione ('42 + 17'); il modello la formatta dal nome param `expr`.
-        "description": "Calcola il risultato di una somma, sottrazione, moltiplicazione o divisione tra numeri.",
+        # v6: esplicitato "solo numeri espliciti, mai nomi" — nella baseline bench_hard il 14B
+        # mandava argomenti simbolici ('result * 641') bruciando 5 call in ERROR. Wording neutro.
+        "description": (
+            "Calcola il risultato di una somma, sottrazione, moltiplicazione o divisione tra numeri. "
+            "Accetta parentesi, es. '(42 + 17) * 8377'. Scrivi SOLO numeri espliciti e operatori: "
+            "niente nomi o parole dentro l'espressione."
+        ),
         "parameters": {
             "type": "object",
             "properties": {"expr": {"type": "string"}},
@@ -417,13 +438,39 @@ class AnthropicProvider:
 # un'espressione/**" (calc) che co-occorrendo leggeva come tooling da injection → category=cyber,
 # 100% deterministico. Isolato con probe_fix.py: neutralizzare le description → ~20-40% residuo
 # stocastico (il thinking sempre-on). Perciò bench.py TRATTA il refusal come 3° esito. Vedi README.
+# SYSTEM v6 (loop-discipline, 15 lug): la baseline bench_hard (33.3%) ha mostrato tre
+# vizi del regime v5 sul 14B: (1) pianifica TUTTI gli stadi nel thinking del 1° turno
+# → 4096 token bruciati prima della prima call (trunc 15/45); (2) argomenti calc
+# simbolici ('result * 641') → ERROR a raffica; (3) grind aritmetico in-testa → scivola
+# sulle mult a molte cifre. Le regole sotto attaccano esattamente questi tre. # VERIFIED 15 lug
 SYSTEM = (
-    "Sei un assistente che risolve piccoli problemi aritmetici. "
-    "Hai a disposizione dei tool: kv_get restituisce il numero associato a un nome "
-    "(alpha, beta, gamma, delta), calc calcola somme, sottrazioni, moltiplicazioni e divisioni, "
-    "word_count conta le parole di un testo. "
-    "Usa i tool per ottenere i valori e fare i calcoli con precisione. "
-    "Concludi la risposta con una riga: RISPOSTA: <numero>."
+    "Sei un assistente che risolve problemi aritmetici a più stadi usando i tool. "
+    "Regole operative: "
+    "(1) AGISCI SUBITO: fai la prima chiamata tool immediatamente, senza pianificare in anticipo "
+    "gli stadi successivi — li affronterai uno alla volta. "
+    "(2) Ogni operazione aritmetica va fatta con calc, mai a mente. "
+    "(3) L'argomento di calc contiene SOLO numeri espliciti e operatori, con parentesi se serve "
+    "(es. '(42 + 17) * 8377'); mai nomi come alpha o result: sostituiscili col numero già letto. "
+    "(4) Fai UNA operazione dipendente per volta: chiama, leggi il risultato, e usa QUEL numero "
+    "nello stadio successivo. "
+    "(5) Se un tool risponde NOT_FOUND o ERROR, non fermarti: applica la regola o il percorso "
+    "alternativo indicato dal problema. "
+    "(6) Tieni il ragionamento tra una chiamata e l'altra BREVE (una frase). "
+    "(7) Per la SOMMA DELLE CIFRE di un numero: ricopia le sue cifre una per una separate da + "
+    "e falla calcolare a calc (es. somma cifre di 4082 → calc '4 + 0 + 8 + 2'). "
+    "(8) Per le ULTIME N CIFRE di un numero: leggile dalle ultime N posizioni scritte "
+    "(es. ultime 3 cifre di 7305218 → 218; gli zeri iniziali cadono: ultime 4 di 90008 → 8). "
+    "(9) Per la PARTE INTERA di una divisione: leggi il risultato di calc e prendi le cifre "
+    "prima della virgola. "
+    "(10) Prima di ogni chiamata scrivi UNA riga che ricopia la definizione esatta dello stadio "
+    "corrente dal problema, coi numeri già sostituiti (es. 'Stadio 2: ultime 4 cifre di 7305218 "
+    "= 5218, poi 5218 * 129') — così non salti nessuna estrazione. "
+    "(11) Se il problema richiede K passi ripetuti, scrivi 'Passo i di K' a ogni passo "
+    "e fermati ESATTAMENTE al passo K. "
+    "(12) PARI o DISPARI si giudica SOLO dall'ultima cifra del numero: se finisce in 0, 2, 4, 6, 8 "
+    "è pari; se finisce in 1, 3, 5, 7, 9 è dispari (es. 73 finisce in 3 → dispari). "
+    "Concludi la risposta con una riga che contiene SOLO il numero finale già calcolato, "
+    "senza espressioni: 'RISPOSTA: 137', MAI 'RISPOSTA: 140 - 3 = 137'."
 )
 
 # NEUTRAL_SYSTEM: nessun tool nominato, nessun piano — per il rung H0 (naked) della ladder,
@@ -440,15 +487,33 @@ REPAIR_MSG = (
     "rifai il calcolo con precisione e concludi con una riga: RISPOSTA: <numero>."
 )
 
+# CONTINUE_MSG (v6, loop-logic): il regime think-off ogni tanto emette la riga-scaffold
+# dello stadio (regola 10) SENZA la tool call e si ferma lì — un non-answer che il loop
+# v5 accettava come finale (bench_hard canary 061027: err_fallback, turns=6, testo senza
+# RISPOSTA). Se il turno non ha né tool_calls né 'RISPOSTA:', si spinge UNA continuazione:
+# o chiami il tool dello stadio, o concludi. Non è coaching sul contenuto (nessun numero
+# suggerito), è il contratto del loop: 'un messaggio senza call e senza risposta non
+# chiude il task'. Cap a max_continues per non mascherare loop infiniti. # VERIFIED 15 lug
+CONTINUE_MSG = (
+    "Non hai chiamato nessun tool e non hai concluso. Continua: chiama il tool "
+    "dello stadio corrente, oppure concludi con la riga 'RISPOSTA: <numero>'."
+)
+
 
 def run_agent(
     provider,
     task_prompt: str,
-    max_turns: int = 6,
+    # v6: 6→32. Il tetto a 6 affamava le catene con >=5 joint di lettura-risultato
+    # (bench_hard baseline: double_not_found 5/5 [MAX_TURNS]); 24 affamava ancora
+    # lcg_iter in regime disciplinato 1-call-per-turno (8 passi × 3 call + kv + x0 +
+    # risposta ≈ 28 turni). 32 = budget per la catena più lunga + margine repair;
+    # non è un invito al vagabondaggio: temp=0 non esplora. # VERIFIED 15 lug
+    max_turns: int = 32,
     system: str = SYSTEM,
     tools_enabled: bool = True,
     required_tools: set | None = None,
     max_repairs: int = 0,
+    max_continues: int = 2,
 ) -> dict:
     """Esegue un task. Ritorna metriche complete. Non solleva su errori-modello (li logga);
     solleva solo su errori di rete/API già ritentati (li conta come ERROR, non FAIL).
@@ -465,6 +530,7 @@ def run_agent(
     truncated = recovered = False
     last_finish = None
     repair_rounds = 0
+    continue_rounds = 0
     t0 = time.perf_counter()
     for turn in range(max_turns):
         out = provider.call(system, transcript, tools_enabled)
@@ -490,6 +556,19 @@ def run_agent(
                 repair_rounds += 1
                 transcript.append({"role": "user", "text": REPAIR_MSG})
                 continue
+            # v6: un messaggio senza tool call e senza 'RISPOSTA:' non chiude il task
+            # (vedi CONTINUE_MSG). Il refusal non si spinge mai, come per il repair.
+            needs_continue = (
+                max_continues > 0
+                and continue_rounds < max_continues
+                and "RISPOSTA" not in (out["text"] or "").upper()
+                and out["finish_reason"] != "refusal"
+                and turn + 1 < max_turns
+            )
+            if needs_continue:
+                continue_rounds += 1
+                transcript.append({"role": "user", "text": CONTINUE_MSG})
+                continue
             return _result(
                 out["text"],
                 turn + 1,
@@ -502,6 +581,7 @@ def run_agent(
                 transcript,
                 last_finish,
                 repair_rounds,
+                continue_rounds,
             )
         for tc in out["tool_calls"]:
             tool_names.append(tc["name"])
@@ -525,6 +605,7 @@ def run_agent(
         transcript,
         last_finish,
         repair_rounds,
+        continue_rounds,
     )
 
 
@@ -540,6 +621,7 @@ def _result(
     transcript,
     finish=None,
     repair_rounds=0,
+    continue_rounds=0,
 ) -> dict:
     return {
         "final": final,
@@ -553,6 +635,7 @@ def _result(
         "finish_reason": finish,  # stop_reason raw: end_turn / tool_use / refusal / max_tokens
         "repaired": repair_rounds > 0,  # pass riparato ≠ pass liscio: mai sommarli
         "repair_rounds": repair_rounds,
+        "continue_rounds": continue_rounds,  # spinte 'non hai né chiamato né concluso' (v6)
         "latency_s": round(time.perf_counter() - t0, 2),
         "transcript": transcript,
     }
