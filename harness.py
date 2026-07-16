@@ -49,7 +49,12 @@ def _safe_eval(node: ast.AST) -> float:
 def tool_calc(expr: str) -> str:
     try:
         v = _safe_eval(ast.parse(str(expr), mode="eval").body)
-        return str(int(v) if isinstance(v, float) and v.is_integer() else v)
+        # v8 (echo contract, 16 lug): ritorna 'expr = risultato', non il numero nudo.
+        # Su catene multi-stadio think-off il transcript È la working memory: il numero
+        # nudo perde l'attribuzione allo stadio, l'eco àncora espressione e risultato
+        # insieme (l'estrazione cifre legge da qui). Task-agnostico: solo formato output.
+        r = str(int(v) if isinstance(v, float) and v.is_integer() else v)
+        return f"{expr} = {r}"
     except ZeroDivisionError:
         # v6: la divisione per zero NON è "espressione non valida" (l'espressione era
         # numerica e ben formata) — il messaggio generico depistava il recovery del task
@@ -506,7 +511,7 @@ def run_agent(
     # lcg_iter in regime disciplinato 1-call-per-turno (8 passi × 3 call + kv + x0 +
     # risposta ≈ 28 turni). 32 = budget per la catena più lunga + margine repair;
     # non è un invito al vagabondaggio: temp=0 non esplora. # VERIFIED 15 lug
-    max_turns: int = 32,
+    max_turns: int = 48,
     system: str = SYSTEM,
     tools_enabled: bool = True,
     required_tools: set | None = None,

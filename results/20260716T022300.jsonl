@@ -1,0 +1,7 @@
+{"MANIFEST": {"run_id": "20260716T022300", "bench": "hard", "harness_md5": "b8b64783", "bench_hard_md5": "4764eee7", "git_rev": "3eb0890", "model": "qwen/qwen3-14b", "n": 5, "tasks": 1, "only": "div_zero", "max_tokens": 4096, "temperature": 0.0, "reasoning_fallback": true, "repair": 0, "thinking": "on", "timeout_s": 600, "note": "bench_hard: task congelati post-baseline; si migliora solo harness.py"}}
+{"task": "div_zero", "answer": 88812, "strict": true, "lenient": true, "repaired": false, "repair_rounds": 0, "final": "\n\nRISPOSTA: 88812", "tool_names": ["kv_get", "kv_get", "calc", "calc", "calc", "calc", "calc", "calc"], "turns": 8, "truncated": false, "recovered_from_reasoning": false, "finish_reason": "stop", "tokens_out": 5101, "latency_s": 329.72}
+{"task": "div_zero", "error": "HTTP Error 400: Bad Request"}
+{"task": "div_zero", "error": "HTTP Error 400: Bad Request"}
+{"task": "div_zero", "error": "HTTP Error 400: Bad Request"}
+{"task": "div_zero", "error": "HTTP Error 400: Bad Request"}
+{"SUMMARY": {"name": "LOCAL: qwen/qwen3-14b", "strict": 1, "strict_clean": 1, "strict_repaired": 0, "lenient": 1, "runs_ok": 1, "errors": 4, "trunc": 0, "recov": 0, "max_turns_hit": 0, "traj_ok": 1, "traj_n": 1, "tool_calls": 8, "tok_out": 5101, "lat": 329.72, "refusal": 0, "wilson_lo": 0.20654329147389294, "wilson_hi": 1.0, "answer_acc": 1.0, "answered": 1}, "per_task": {"div_zero": {"strict": 1, "lenient": 1, "err": 4, "refusal": 0}}}

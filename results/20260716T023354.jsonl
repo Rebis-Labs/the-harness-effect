@@ -1,0 +1,4 @@
+{"MANIFEST": {"run_id": "20260716T023354", "bench": "hard", "harness_md5": "b8b64783", "bench_hard_md5": "4764eee7", "git_rev": "3eb0890", "model": "qwen/qwen3-14b", "n": 5, "tasks": 1, "only": "double_not_found", "max_tokens": 4096, "temperature": 0.0, "reasoning_fallback": true, "repair": 0, "thinking": "on", "timeout_s": 600, "note": "bench_hard: task congelati post-baseline; si migliora solo harness.py"}}
+{"task": "double_not_found", "error": "HTTP Error 400: Bad Request"}
+{"task": "double_not_found", "error": "HTTP Error 400: Bad Request"}
+{"task": "double_not_found", "error": "HTTP Error 400: Bad Request"}
