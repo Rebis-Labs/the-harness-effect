@@ -200,7 +200,7 @@ TASKS_HARD2 = [
     },
     {
         "id": "interleave_ab",
-        "answer": _sim(A * B, _CA) - _sim(G + D, _CB),
+        "answer": int(str(_sim(G + D, _CB) - _sim(A * B, _CA))[-3:]) * 41,  # diff mid-chain, finale=estrazione+mult (v8 copia l'echo sui finali aritmetici)
         "expected_tools": {"kv_get", "calc"},
         "prompt": (
             "Due catene INDIPENDENTI, da portare avanti ALTERNANDO: prima lo stadio i di A, "
@@ -217,8 +217,9 @@ TASKS_HARD2 = [
                 f"Catena B, {_stage_txt(i, e, p, k, 'dello stadio B precedente' if i > 1 else 'iniziale di B')}"
                 for i, (e, p, k) in enumerate(_CB, 1)
             )
-            + " Alla fine calcola con calc: risultato di A6 meno risultato di B6. "
-            "Concludi con RISPOSTA: <quel numero>."
+            + " Poi calcola con calc: risultato di B6 meno risultato di A6. "
+            "Stadio finale: le ultime 3 cifre di quella differenza, moltiplicate per 41. "
+            "Concludi con RISPOSTA: <numero dello stadio finale>."
         ),
     },
     {

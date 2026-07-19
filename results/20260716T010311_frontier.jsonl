@@ -1,0 +1,6 @@
+{"MANIFEST": {"run_id": "20260716T010311", "bench": "hard-frontier", "harness_md5": "234a463d", "bench_hard_md5": "4764eee7", "git_rev": "3eb0890", "provider": "openrouter", "model": "anthropic/claude-opus-4.8", "n": 5, "tasks": 1, "only": "parity_branch", "max_tokens": 4096, "sampling_omitted": true, "thinking": "native", "timeout_s": 600, "note": "stesso harness v7 del run locale 40/45; cambia solo il modello (via OR)"}}
+{"task": "parity_branch", "error": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"}
+{"task": "parity_branch", "error": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"}
+{"task": "parity_branch", "error": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"}
+{"task": "parity_branch", "error": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"}
+{"task": "parity_branch", "error": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"}

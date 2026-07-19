@@ -30,3 +30,24 @@ sui modelli Anthropic → stima grezza $15-30 per colonna frontier a N=10.
 
 Dopo il fix staged_chain sul locale (la leva meccanica tool-output entra
 nell'harness PRIMA di congelare bench_hard2, così le colonne nascono comparabili).
+
+## Stato qualificazione (19 lug, post colonna locale + canary)
+
+- **Locale v8: 20/25 = 80%** — interleave_ab 0/5 con errore REALE (estrazione cifre sbagliata
+  sotto carico di doppio stato, verificato da transcript), altri 4 task 5/5.
+- **Canary frontier**: Sonnet 5 risolve interleave 2/2 ($0.20 misurati / 2 trial →
+  colonna piena ≈ $2.5 Sonnet, ≈ $6 Opus).
+- **Verdetto parziale**: bench_hard2 v1 misura il gap locale↔frontiera (via interleave) ma
+  quasi certamente NON discrimina frontier↔frontier (proiezione: tutti ~100%). Prima di
+  spendere su colonne frontier piene serve un'altra asse di difficoltà: 3 catene interlacciate
+  e/o BACK-REFERENCE a stadi precedenti ("stadio 9: somma dello stadio 3 e dello stadio 6") —
+  rompe la stampella dell'ultimo echo, forza memoria ad accesso casuale sul transcript.
+
+## Finding harness v8 (candidato guard v9 — NON applicato)
+
+L'echo contract fa copiare al modello l'echo dentro la riga RISPOSTA sui finali a
+SOTTRAZIONE ("RISPOSTA: 21554 - 15325 = 6229", 10/10 deterministico) → strict fail con
+sostanza giusta. Su bench_hard non emerge (nessun finale a sottrazione). Mitigazione
+task-side adottata: mai sottrazione come ultimo stadio. Fix harness candidato: loop-guard
+che su "RISPOSTA:.*=" chiede di riscrivere solo il numero (stessa classe di REPAIR/CONTINUE).
+Applicarlo = v9 → ri-validare bench_hard 45/45 prima di ogni confronto.
