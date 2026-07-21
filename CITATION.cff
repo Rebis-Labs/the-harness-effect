@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this benchmark or methodology, please cite it as below."
+title: "The Harness Effect: measuring how much of LLM capability is the scaffold"
+type: software
+authors:
+  - family-names: "Esposito Brescia"
+    given-names: "Alessandro"
+    affiliation: "Rebis Labs"
+repository-code: "https://github.com/Rebis-Labs/the-harness-effect"
+license: MIT
+date-released: 2026-07-21
+keywords:
+  - large language models
+  - evaluation
+  - agent harness
+  - tool use
+  - benchmarks
+  - local llm
+abstract: >-
+  Observed capability = model x harness. A minimal, dependency-free lab that
+  holds the harness constant to measure the model, then holds the model
+  constant to measure the harness. On a frozen 9-task tool-use benchmark, a
+  local 14B Q4 model went from 33% to 100% through harness changes alone.
