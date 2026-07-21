@@ -1,0 +1,6 @@
+{"MANIFEST": {"run_id": "20260721T232129", "bench": "naked-ledger", "harness_md5": "b8b64783", "model": "anthropic/claude-sonnet-5", "L": 48, "n": 5, "thinking": "native", "note": "rung h0 naked, no tools, ledger self-contained"}}
+{"i": 0, "L": 48, "gold": 148, "answer": 148.0, "pass": true, "final": "RISPOSTA: 148", "tok": 609, "lat": 7.2, "finish": "stop"}
+{"i": 1, "L": 48, "gold": 40, "answer": 40.0, "pass": true, "final": "RISPOSTA: 40", "tok": 593, "lat": 7.2, "finish": "stop"}
+{"i": 2, "L": 48, "gold": 82, "answer": 82.0, "pass": true, "final": "RISPOSTA: 82", "tok": 570, "lat": 6.8, "finish": "stop"}
+{"i": 3, "L": 48, "gold": 53, "answer": 53.0, "pass": true, "final": "RISPOSTA: 53", "tok": 618, "lat": 7.0, "finish": "stop"}
+{"i": 4, "L": 48, "gold": 134, "answer": 134.0, "pass": true, "final": "RISPOSTA: 134", "tok": 626, "lat": 8.1, "finish": "stop"}

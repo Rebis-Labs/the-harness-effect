@@ -1,0 +1,3 @@
+{"MANIFEST": {"run_id": "20260721T232239", "bench": "naked-ledger", "harness_md5": "b8b64783", "model": "qwen/qwen3-14b", "L": 96, "n": 3, "thinking": "native", "note": "rung h0 naked, no tools, ledger self-contained"}}
+{"i": 0, "L": 96, "gold": -19, "answer": -17.0, "pass": false, "final": "\n\nRISPOSTA: -17.", "tok": 2818, "lat": 105.3, "finish": "stop"}
+{"i": 1, "L": 96, "gold": 49, "answer": 49.0, "pass": true, "final": "\n\nRISPOSTA: 49", "tok": 2650, "lat": 99.9, "finish": "stop"}

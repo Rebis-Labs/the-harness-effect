@@ -1,0 +1,6 @@
+{"MANIFEST": {"run_id": "20260721T232022", "bench": "naked-ledger", "harness_md5": "b8b64783", "model": "openai/gpt-4o-mini", "L": 48, "n": 5, "thinking": "native", "note": "rung h0 naked, no tools, ledger self-contained"}}
+{"i": 0, "L": 48, "gold": 148, "answer": 148.0, "pass": true, "final": "\n\nDopo aver eseguito tutte le operazioni, il saldo finale \u00e8 148.\n\nRISPOSTA: 148.", "tok": 1249, "lat": 16.4, "finish": "stop"}
+{"i": 1, "L": 48, "gold": 40, "answer": 58.0, "pass": false, "final": "\n48) 30 + 28 = 58\n\nIl saldo finale dopo tutte le operazioni \u00e8 58.\n\nRISPOSTA: 58.", "tok": 741, "lat": 13.3, "finish": "stop"}
+{"i": 2, "L": 48, "gold": 82, "answer": 82.0, "pass": true, "final": "3\n48) 73 + 9 = 82\n\nIl saldo finale dopo tutte le operazioni \u00e8 82.\n\nRISPOSTA: 82.", "tok": 719, "lat": 9.6, "finish": "stop"}
+{"i": 3, "L": 48, "gold": 53, "answer": 53.0, "pass": true, "final": "53\n\nDopo aver eseguito tutte le operazioni, il saldo finale \u00e8 53.\n\nRISPOSTA: 53.", "tok": 1170, "lat": 12.8, "finish": "stop"}
+{"i": 4, "L": 48, "gold": 134, "answer": 118.0, "pass": false, "final": "\n\nDopo aver eseguito tutte le operazioni, il saldo finale \u00e8 118.\n\nRISPOSTA: 118.", "tok": 1289, "lat": 14.7, "finish": "stop"}

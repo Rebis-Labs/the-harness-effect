@@ -1,0 +1,2 @@
+{"MANIFEST": {"run_id": "20260721T155535", "bench": "naked-ledger", "harness_md5": "b8b64783", "model": "anthropic/claude-sonnet-5", "L": 48, "n": 1, "thinking": "native", "note": "rung h0 naked, no tools, ledger self-contained"}}
+{"i": 0, "L": 48, "gold": 148, "answer": 148.0, "pass": true, "final": "RISPOSTA: 148", "tok": 609, "lat": 7.1, "finish": "stop"}

@@ -1,0 +1,6 @@
+{"MANIFEST": {"run_id": "20260721T232206", "bench": "naked-ledger", "harness_md5": "b8b64783", "model": "anthropic/claude-opus-4.8", "L": 48, "n": 5, "thinking": "native", "note": "rung h0 naked, no tools, ledger self-contained"}}
+{"i": 0, "L": 48, "gold": 148, "answer": 148.0, "pass": true, "final": " \u2192 +31 = 98\n46) -11 = 87\n47) 87>150? no \u2192 +34 = 121\n48) +27 = 148\n\nRISPOSTA: 148", "tok": 599, "lat": 6.8, "finish": "stop"}
+{"i": 1, "L": 48, "gold": 40, "answer": 40.0, "pass": true, "final": "17=53\n46) 53 dispari \u2192 -30=23\n47) 23 dispari \u2192 -11=12\n48) 12+28=40\n\nRISPOSTA: 40", "tok": 556, "lat": 6.5, "finish": "stop"}
+{"i": 2, "L": 48, "gold": 82, "answer": 82.0, "pass": true, "final": "0\n45) pari \u2192 +14 \u2192 104\n46) -34 \u2192 70\n47) pari \u2192 +3 \u2192 73\n48) +9 \u2192 82\n\nRISPOSTA: 82", "tok": 535, "lat": 6.4, "finish": "stop"}
+{"i": 3, "L": 48, "gold": 53, "answer": 53.0, "pass": true, "final": "4 = 81\n46) -39 = 42\n47) 42 \u226491 \u2192 +15 = 57\n48) 57 dispari \u2192 -4 = 53\n\nRISPOSTA: 53", "tok": 607, "lat": 7.1, "finish": "stop"}
+{"i": 4, "L": 48, "gold": 134, "answer": 134.0, "pass": true, "final": "6) -9 = 147\n47) 147 dispari \u2192 -11 = 136\n48) 136>79? s\u00ec \u2192 -2 = 134\n\nRISPOSTA: 134", "tok": 609, "lat": 6.7, "finish": "stop"}
