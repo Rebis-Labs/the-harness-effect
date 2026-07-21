@@ -2,8 +2,9 @@
 """Colonne frontiera/cloud su bench_hard CONGELATO, via OpenRouter.
 
 Domanda (15 lug): il 14B locale + harness v7 (40/45) regge il confronto con
-(a) i frontier e (b) openai/gpt-4o-mini — il generator di ATANOR? Se il locale
-è ≈ gpt-4o-mini sul tool-use loop, un generator proprietario è plausibile.
+(a) i frontier e (b) openai/gpt-4o-mini — il generator tipico di un prodotto RAG
+in produzione? Se il locale è ≈ gpt-4o-mini sul tool-use loop, un generator
+self-hosted è plausibile.
 
 TASKS_HARD e score_strict restano congelati: questo file è solo un runner.
 Stesso harness (SYSTEM v7, loop, tool): cambia SOLO il modello sotto.
@@ -39,14 +40,15 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1"
 
 def _load_key() -> str:
     key = os.environ.get("OPENROUTER_API_KEY")
-    if not key:  # fallback: la chiave vive in atanor/.env (convenzione workspace)
-        env = HERE.parent / "atanor" / ".env"
-        for line in env.read_text().splitlines():
-            if line.startswith("OPENROUTER_API_KEY="):
-                key = line.split("=", 1)[1].strip().strip('"')
-                break
+    if not key:  # fallback: .env locale del repo (gitignored)
+        env = HERE / ".env"
+        if env.exists():
+            for line in env.read_text().splitlines():
+                if line.startswith("OPENROUTER_API_KEY="):
+                    key = line.split("=", 1)[1].strip().strip('"')
+                    break
     if not key:
-        raise SystemExit("OPENROUTER_API_KEY mancante (env o atanor/.env)")
+        raise SystemExit("OPENROUTER_API_KEY mancante (env o .env nel repo)")
     return key
 
 
